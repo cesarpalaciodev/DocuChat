@@ -1,5 +1,12 @@
 # DocuChat - RAG Chatbot for Technical Documentation
 
+[![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.6-blue)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/react-18-61DAFB)](https://react.dev/)
+[![Tests](https://img.shields.io/badge/tests-43%20passing-green)](./backend/tests/)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![CI](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml)
+
 Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Uses **TF-IDF** + **numpy** + **SQLite** with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
 
 ## Features
