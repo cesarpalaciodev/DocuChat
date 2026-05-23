@@ -24,6 +24,12 @@ MAX_BODY_SIZE = 10 * 1024 * 1024
 async def lifespan(app: FastAPI):
     settings.vector_store_path.mkdir(parents=True, exist_ok=True)
     settings.clone_path.mkdir(parents=True, exist_ok=True)
+    import shutil
+    for item in settings.clone_path.iterdir():
+        try:
+            shutil.rmtree(item, ignore_errors=True)
+        except Exception:
+            pass
     if not settings.llm_api_key or len(settings.llm_api_key) < 10:
         logger.error("LLM_API_KEY not configured or too short")
         raise SystemExit("LLM_API_KEY must be a valid API key in .env")

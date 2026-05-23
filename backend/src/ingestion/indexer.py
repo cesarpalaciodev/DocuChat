@@ -97,7 +97,11 @@ class NumpyVectorStore:
         all_candidates: list[tuple[float, str, dict]] = []
 
         for shard_path in shards:
-            data = np.load(shard_path, allow_pickle=True)
+            try:
+                data = np.load(shard_path, allow_pickle=True)
+            except (FileNotFoundError, OSError):
+                logger.warning("Shard file missing: %s", shard_path)
+                continue
             vectors: np.ndarray = data["vectors"]
             texts: np.ndarray = data["texts"]
             metadatas: np.ndarray = data["metadatas"]
