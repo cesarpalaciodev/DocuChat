@@ -125,7 +125,7 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
                 continue
 
             try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
             except Exception:
                 continue
@@ -182,10 +182,9 @@ def ingest_repository(repo_url: str, branch: str = "main") -> dict[str, Any]:
             })
             total_chunks += 1
 
-    try:
+    from contextlib import suppress
+    with suppress(Exception):
         shutil.rmtree(clone_path, onerror=_on_rm_error)
-    except Exception:
-        pass
 
     return {
         "id": repo_uuid,
