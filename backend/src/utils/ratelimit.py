@@ -1,6 +1,7 @@
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
+
 from fastapi import Request, Response
 
 _BUCKETS: dict[str, deque[float]] = defaultdict(lambda: deque())
