@@ -100,3 +100,46 @@ async def get_conversation(conv_id: str) -> dict[str, Any]:
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"id": conv_id, "messages": messages}
+
+
+@router.delete("/conversations/{conv_id}")
+async def delete_conversation(conv_id: str) -> dict[str, str]:
+    deleted = db.conversation_delete(conv_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    logger.info("Conversation deleted: %s", conv_id)
+    return {"message": "Conversation deleted successfully"}
+
+
+@router.get("/conversations/{conv_id}/export")
+async def export_conversation(conv_id: str) -> dict[str, str]:
+    messages = db.messages_list(conv_id)
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    md_lines = ["# DocuChat Conversation\n\n"]
+    for m in messages:
+        role = m["role"]
+        content = m["content"]
+        sources_raw = m.get("sources", "[]")
+        sources: list[dict[str, Any]] = []
+        if isinstance(sources_raw, str):
+            try:
+                sources = json.loads(sources_raw)
+            except Exception:
+                sources = []
+        elif isinstance(sources_raw, list):
+            sources = sources_raw
+
+        prefix = "**You**" if role == "user" else "**DocuChat**"
+        md_lines.append(f"### {prefix}\n\n{content}\n\n")
+
+        if role == "assistant" and sources:
+            md_lines.append("**Sources:**\n")
+            for s in sources:
+                md_lines.append(f"- `{s.get('file_path', 'unknown')}`\n")
+            md_lines.append("\n")
+
+        md_lines.append("---\n\n")
+
+    return {"markdown": "".join(md_lines), "conversation_id": conv_id}

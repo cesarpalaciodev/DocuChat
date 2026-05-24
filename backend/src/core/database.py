@@ -144,3 +144,12 @@ def messages_list(conversation_id: str) -> list[dict[str, Any]]:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def conversation_delete(conv_id: str) -> bool:
+    conn = get_db()
+    cursor = conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted

@@ -86,6 +86,34 @@ class ChatResponse(BaseModel):
     conversation_id: str | None = None
 
 
+class SearchRequest(BaseModel):
+    query: str
+    repo_id: str | None = None
+    top_k: int = 4
+
+    @field_validator("query")
+    @classmethod
+    def query_not_empty_search(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Query cannot be empty")
+        return v.strip()[:5000]
+
+    @field_validator("top_k")
+    @classmethod
+    def top_k_valid(cls, v: int) -> int:
+        if v < 1 or v > 20:
+            raise ValueError("top_k must be between 1 and 20")
+        return v
+
+
+class SearchResult(BaseModel):
+    content: str
+    file_path: str
+    repo_name: str
+    score: float
+    chunk_index: int
+
+
 class RepoResponse(BaseModel):
     id: str
     url: str

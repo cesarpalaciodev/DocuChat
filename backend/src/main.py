@@ -84,8 +84,31 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 
 @app.get("/api/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "version": "1.0.0"}
+async def health() -> dict[str, object]:
+    from src.core import database as db
+    repos = db.repo_list()
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "indexed_repos": len(repos),
+        "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
+    }
+
+
+@app.get("/api/stats")
+async def stats() -> dict[str, object]:
+    from src.core import database as db
+    repos = db.repo_list()
+    total_chunks = sum(r.get("indexed_documents", 0) for r in repos)
+    conversations = db.conversation_list()
+    return {
+        "total_repos": len(repos),
+        "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
+        "indexing_repos": sum(1 for r in repos if r.get("status") == "indexing"),
+        "error_repos": sum(1 for r in repos if r.get("status") == "error"),
+        "total_chunks": total_chunks,
+        "total_conversations": len(conversations),
+    }
 
 
 if STATIC_DIR.exists() and list(STATIC_DIR.glob("index.html")):
