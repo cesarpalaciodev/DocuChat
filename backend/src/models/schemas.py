@@ -1,5 +1,6 @@
 import re
 from urllib.parse import urlparse
+
 from pydantic import BaseModel, field_validator
 
 from src.core.config import settings
@@ -34,7 +35,7 @@ def _validate_url(url: str) -> str:
     except ValueError as e:
         if "Host" in str(e):
             raise
-        raise ValueError("Invalid URL format")
+        raise ValueError("Invalid URL format") from None
 
     if not url.rstrip("/").endswith(".git") and "/" in parsed.path:
         pass

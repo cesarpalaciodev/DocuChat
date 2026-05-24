@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from src.core import database as db
 from src.models.schemas import ChatRequest, ChatResponse, SourceDocument
 from src.rag.chain import query, query_stream
-from src.utils.exceptions import DocuChatError, RepoNotFoundError, LLMError
+from src.utils.exceptions import DocuChatError, LLMError, RepoNotFoundError
 from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -68,7 +68,12 @@ async def chat_stream(body: ChatRequest):
                         done_data = json.loads(token)
                         sources = done_data.get("sources", [])
                         db.message_add(conv_id, "assistant", full_answer, sources)
-                        yield f"data: {json.dumps({'done': True, 'conv_id': conv_id, 'repo_name': done_data.get('repo_name'), 'sources': sources})}\n\n"
+                        done_payload = json.dumps({
+                            "done": True, "conv_id": conv_id,
+                            "repo_name": done_data.get("repo_name"),
+                            "sources": sources,
+                        })
+                        yield f"data: {done_payload}\n\n"
                     except Exception:
                         pass
                     break
@@ -88,8 +93,48 @@ async def list_conversations(repo_id: str | None = None) -> list[dict]:
 
 
 @router.get("/conversations/{conv_id}")
-async def get_conversation(conv_id: str) -> dict:
+async def get_conversation(conv_id: str) -> dict[str, object]:
     messages = db.messages_list(conv_id)
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"id": conv_id, "messages": messages}
+
+
+@router.delete("/conversations/{conv_id}")
+async def delete_conversation(conv_id: str) -> dict[str, str]:
+    deleted = db.conversation_delete(conv_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    logger.info("Conversation deleted: %s", conv_id)
+    return {"message": "Conversation deleted successfully"}
+
+
+@router.get("/conversations/{conv_id}/export")
+async def export_conversation(conv_id: str) -> dict[str, str]:
+    messages = db.messages_list(conv_id)
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    md_lines = ["# DocuChat Conversation\n"]
+    for m in messages:
+        role = m["role"]
+        content = m["content"]
+        sources = m.get("sources", "[]")
+        if isinstance(sources, str):
+            try:
+                sources = json.loads(sources)
+            except Exception:
+                sources = []
+
+        prefix = "**You**" if role == "user" else "**DocuChat**"
+        md_lines.append(f"### {prefix}\n\n{content}\n")
+
+        if role == "assistant" and sources:
+            md_lines.append("**Sources:**\n")
+            for s in sources:
+                md_lines.append(f"- `{s['file_path']}`\n")
+            md_lines.append("\n")
+
+        md_lines.append("---\n\n")
+
+    return {"markdown": "".join(md_lines), "conversation_id": conv_id}
