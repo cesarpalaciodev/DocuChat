@@ -1,16 +1,26 @@
 import { useState, useRef, useEffect, FormEvent } from "react"
 import ReactMarkdown from "react-markdown"
-import { useChat } from "../hooks/useChat"
+import { useChat, Message } from "../hooks/useChat"
 import SourceCitation from "./SourceCitation"
 
 interface Props {
   selectedRepo: string | null
+  loadHistory: string | null
 }
 
-export default function ChatWindow({ selectedRepo }: Props) {
-  const { messages, loading, ask, clear } = useChat()
+export default function ChatWindow({ selectedRepo, loadHistory }: Props) {
+  const { messages, loading, ask, clear, loadMessages } = useChat()
   const [input, setInput] = useState("")
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (loadHistory) {
+      try {
+        const msgs: Message[] = JSON.parse(loadHistory)
+        loadMessages(msgs)
+      } catch { /* ignore */ }
+    }
+  }, [loadHistory, loadMessages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
