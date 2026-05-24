@@ -1,5 +1,6 @@
 import re
 from urllib.parse import urlparse
+
 from pydantic import BaseModel, field_validator
 
 from src.core.config import settings
@@ -34,7 +35,7 @@ def _validate_url(url: str) -> str:
     except ValueError as e:
         if "Host" in str(e):
             raise
-        raise ValueError("Invalid URL format")
+        raise ValueError("Invalid URL format") from None
 
     if not url.rstrip("/").endswith(".git") and "/" in parsed.path:
         pass
@@ -83,6 +84,34 @@ class ChatResponse(BaseModel):
     sources: list[SourceDocument]
     repo_name: str | None = None
     conversation_id: str | None = None
+
+
+class SearchRequest(BaseModel):
+    query: str
+    repo_id: str | None = None
+    top_k: int = 4
+
+    @field_validator("query")
+    @classmethod
+    def query_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Query cannot be empty")
+        return v.strip()[:5000]
+
+    @field_validator("top_k")
+    @classmethod
+    def top_k_valid(cls, v: int) -> int:
+        if v < 1 or v > 20:
+            raise ValueError("top_k must be between 1 and 20")
+        return v
+
+
+class SearchResult(BaseModel):
+    content: str
+    file_path: str
+    repo_name: str
+    score: float
+    chunk_index: int
 
 
 class RepoResponse(BaseModel):

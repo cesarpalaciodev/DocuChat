@@ -1,9 +1,9 @@
 from src.utils.exceptions import (
     DocuChatError,
-    RepoCloneError,
-    RepoNotFoundError,
     IndexingError,
     LLMError,
+    RepoCloneError,
+    RepoNotFoundError,
     ValidationError,
 )
 from src.utils.logging import setup_logger

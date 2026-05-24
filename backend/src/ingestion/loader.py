@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import threading
 import uuid
 from pathlib import Path
@@ -14,6 +15,22 @@ from src.utils.exceptions import RepoCloneError
 from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
+
+
+def _detect_default_branch(repo_url: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "ls-remote", "--symref", repo_url, "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in result.stdout.splitlines():
+            if line.startswith("ref: refs/heads/") and line.endswith("\tHEAD"):
+                branch = line.split("/")[-1].replace("\tHEAD", "").strip()
+                logger.info("Detected default branch: %s for %s", branch, repo_url)
+                return branch
+    except Exception:
+        pass
+    return None
 
 
 def _sanitize_name(name: str) -> str:
@@ -93,7 +110,12 @@ def _clone_repo(repo_url: str, branch: str = "main") -> tuple[str, str, str]:
         raise
     except Exception:
         try:
-            _clone_with_timeout(repo_url, clone_path, None)
+            detected = _detect_default_branch(repo_url)
+            if detected and detected != branch:
+                logger.info("Trying detected default branch: %s", detected)
+                _clone_with_timeout(repo_url, clone_path, detected)
+            else:
+                _clone_with_timeout(repo_url, clone_path, None)
         except RepoCloneError:
             raise
         except Exception as e:
@@ -125,7 +147,7 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
                 continue
 
             try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
             except Exception:
                 continue
@@ -182,10 +204,9 @@ def ingest_repository(repo_url: str, branch: str = "main") -> dict[str, Any]:
             })
             total_chunks += 1
 
-    try:
+    from contextlib import suppress
+    with suppress(Exception):
         shutil.rmtree(clone_path, onerror=_on_rm_error)
-    except Exception:
-        pass
 
     return {
         "id": repo_uuid,

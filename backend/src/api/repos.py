@@ -1,16 +1,16 @@
 import asyncio
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
 from src.core import database as db
 from src.core.config import settings
-from src.ingestion.loader import ingest_repository
 from src.ingestion.indexer import vector_store
+from src.ingestion.loader import ingest_repository
 from src.models.schemas import RepoRequest, RepoResponse
-from src.utils.exceptions import RepoCloneError, RepoNotFoundError, IndexingError
+from src.utils.exceptions import IndexingError, RepoNotFoundError
 from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -62,7 +62,7 @@ async def add_repository(body: RepoRequest) -> RepoResponse:
         name=repo_name,
         indexed_documents=0,
         status="indexing",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
 
 
