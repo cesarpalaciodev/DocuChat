@@ -48,7 +48,7 @@ def _on_rm_error(func: Any, path: str, exc_info: Any) -> None:
 def _clone_with_timeout(repo_url: str, clone_path: Path, branch: str | None = None) -> None:
     result: list[Exception | None] = [None]
 
-    def _clone():
+    def _clone() -> None:
         try:
             if branch:
                 Repo.clone_from(repo_url, str(clone_path), branch=branch, depth=1)
@@ -125,7 +125,7 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
                 continue
 
             try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, encoding="utf-8", errors="ignore") as f:
                     content = f.read()
             except Exception:
                 continue
@@ -143,7 +143,7 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
 def chunk_text(text: str, chunk_size: int, overlap: int, max_chunks: int = _MAX_CHUNKS_PER_FILE) -> list[str]:
     if len(text) <= chunk_size:
         return [text]
-    chunks = []
+    chunks: list[str] = []
     start = 0
     while start < len(text) and len(chunks) < max_chunks:
         end = min(start + chunk_size, len(text))
@@ -182,10 +182,9 @@ def ingest_repository(repo_url: str, branch: str = "main") -> dict[str, Any]:
             })
             total_chunks += 1
 
-    try:
+    from contextlib import suppress
+    with suppress(Exception):
         shutil.rmtree(clone_path, onerror=_on_rm_error)
-    except Exception:
-        pass
 
     return {
         "id": repo_uuid,
