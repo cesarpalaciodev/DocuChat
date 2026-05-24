@@ -13,7 +13,7 @@ class RateLimiter:
         self.requests = requests
         self.window = window
 
-    async def __call__(self, request: Request, call_next: Callable[..., Any]) -> Response:  # type: ignore[return]
+    async def __call__(self, request: Request, call_next: Callable[..., Any]) -> Response:
         key = request.client.host if request.client else "unknown"
         now = time.monotonic()
         bucket = _BUCKETS[key]
@@ -29,4 +29,4 @@ class RateLimiter:
             )
 
         bucket.append(now)
-        return await call_next(request)
+        return await call_next(request)  # type: ignore[return-value]

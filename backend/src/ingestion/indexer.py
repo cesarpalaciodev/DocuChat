@@ -72,11 +72,11 @@ class NumpyVectorStore:
         if repo_id and self._repo_exists(repo_id):
             result_list = self._search_in_repo(query_text, repo_id, top_k)
         else:
-            result_list: list[Any] = []
+            results_all: list[Any] = []
             for rid in self._get_repo_ids():
-                result_list.extend(self._search_in_repo(query_text, rid, top_k))
-            result_list.sort(key=lambda x: x["score"], reverse=True)
-            result_list = result_list[:top_k]
+                results_all.extend(self._search_in_repo(query_text, rid, top_k))
+            results_all.sort(key=lambda x: x["score"], reverse=True)
+            result_list = results_all[:top_k]
 
         _search_cache.set(cache_key, result_list)
         return result_list
@@ -95,7 +95,7 @@ class NumpyVectorStore:
         embedder._idf = idf
         query_vec = embedder._vectorize(query_text)
 
-        all_candidates: list[tuple[float, str, dict]] = []
+        all_candidates: list[tuple[float, str, dict[str, Any]]] = []
 
         for shard_path in shards:
             try:

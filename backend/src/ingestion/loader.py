@@ -143,7 +143,7 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
 def chunk_text(text: str, chunk_size: int, overlap: int, max_chunks: int = _MAX_CHUNKS_PER_FILE) -> list[str]:
     if len(text) <= chunk_size:
         return [text]
-    chunks = []
+    chunks: list[str] = []
     start = 0
     while start < len(text) and len(chunks) < max_chunks:
         end = min(start + chunk_size, len(text))
