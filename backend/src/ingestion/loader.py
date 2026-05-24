@@ -48,7 +48,7 @@ def _on_rm_error(func: Any, path: str, exc_info: Any) -> None:
 def _clone_with_timeout(repo_url: str, clone_path: Path, branch: str | None = None) -> None:
     result: list[Exception | None] = [None]
 
-    def _clone():
+    def _clone() -> None:
         try:
             if branch:
                 Repo.clone_from(repo_url, str(clone_path), branch=branch, depth=1)

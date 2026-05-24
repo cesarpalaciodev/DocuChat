@@ -1,6 +1,7 @@
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import Request, Response
 
@@ -12,7 +13,7 @@ class RateLimiter:
         self.requests = requests
         self.window = window
 
-    async def __call__(self, request: Request, call_next: Callable) -> Response:
+    async def __call__(self, request: Request, call_next: Callable[..., Any]) -> Response:  # type: ignore[return]
         key = request.client.host if request.client else "unknown"
         now = time.monotonic()
         bucket = _BUCKETS[key]

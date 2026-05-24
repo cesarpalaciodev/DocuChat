@@ -125,7 +125,7 @@ def conversation_list(repo_id: str | None = None) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def message_add(conversation_id: str, role: str, content: str, sources: list[dict] | None = None) -> int:
+def message_add(conversation_id: str, role: str, content: str, sources: list[dict[str, object]] | None = None) -> int:
     conn = get_db()
     cursor = conn.execute(
         "INSERT INTO messages (conversation_id, role, content, sources, created_at) VALUES (?, ?, ?, ?, ?)",

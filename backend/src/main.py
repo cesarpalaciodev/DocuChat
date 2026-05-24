@@ -21,7 +21,7 @@ MAX_BODY_SIZE = 10 * 1024 * 1024
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings.vector_store_path.mkdir(parents=True, exist_ok=True)
     settings.clone_path.mkdir(parents=True, exist_ok=True)
     import shutil

@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -50,7 +51,7 @@ async def chat(body: ChatRequest) -> ChatResponse:
 
 
 @router.post("/stream")
-async def chat_stream(body: ChatRequest):
+async def chat_stream(body: ChatRequest) -> StreamingResponse:
     conv_id = body.conversation_id or uuid.uuid4().hex[:16]
     _validate_repo(body.repo_id)
 
@@ -58,7 +59,7 @@ async def chat_stream(body: ChatRequest):
         db.conversation_create(conv_id, body.repo_id)
     db.message_add(conv_id, "user", body.question)
 
-    async def generate():
+    async def generate() -> AsyncGenerator[str, None]:
         full_answer = ""
         try:
             gen = query_stream(body.question, body.repo_id)
@@ -88,12 +89,12 @@ async def chat_stream(body: ChatRequest):
 
 
 @router.get("/conversations")
-async def list_conversations(repo_id: str | None = None) -> list[dict]:
+async def list_conversations(repo_id: str | None = None) -> list[dict[str, object]]:
     return db.conversation_list(repo_id)
 
 
 @router.get("/conversations/{conv_id}")
-async def get_conversation(conv_id: str) -> dict:
+async def get_conversation(conv_id: str) -> dict[str, object]:
     messages = db.messages_list(conv_id)
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
