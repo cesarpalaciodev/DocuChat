@@ -25,11 +25,10 @@ async def lifespan(app: FastAPI):
     settings.vector_store_path.mkdir(parents=True, exist_ok=True)
     settings.clone_path.mkdir(parents=True, exist_ok=True)
     import shutil
+    from contextlib import suppress
     for item in settings.clone_path.iterdir():
-        try:
+        with suppress(Exception):
             shutil.rmtree(item, ignore_errors=True)
-        except Exception:
-            pass
     if not settings.llm_api_key or len(settings.llm_api_key) < 10:
         logger.error("LLM_API_KEY not configured or too short")
         raise SystemExit("LLM_API_KEY must be a valid API key in .env")
@@ -84,7 +83,31 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    from src.core import database as db
+    repos = db.repo_list()
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "indexed_repos": len(repos),
+        "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
+    }
+
+
+@app.get("/api/stats")
+async def stats():
+    from src.core import database as db
+    repos = db.repo_list()
+    total_chunks = sum(r.get("indexed_documents", 0) for r in repos)
+    conversations = db.conversation_list()
+    return {
+        "total_repos": len(repos),
+        "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
+        "indexing_repos": sum(1 for r in repos if r.get("status") == "indexing"),
+        "error_repos": sum(1 for r in repos if r.get("status") == "error"),
+        "total_chunks": total_chunks,
+        "total_conversations": len(conversations),
+        "uptime_seconds": "manual check",
+    }
 
 
 if STATIC_DIR.exists() and list(STATIC_DIR.glob("index.html")):

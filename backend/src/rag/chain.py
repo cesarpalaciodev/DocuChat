@@ -1,5 +1,6 @@
 import json
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import httpx
 
@@ -90,43 +91,42 @@ def query_stream(question: str, repo_id: str | None = None) -> Generator[str, No
     context = _build_context(retrieved)
     url = f"{settings.llm_base_url.rstrip('/')}/chat/completions"
 
-    with httpx.Client(timeout=90) as client:
-        with client.stream(
-            "POST",
-            url,
-            headers={
-                "Authorization": f"Bearer {settings.llm_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": settings.llm_model,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Contexto:\n{context}\n\nPregunta: {question}"},
-                ],
-                "temperature": 0.2,
-                "max_tokens": 2048,
-                "stream": True,
-            },
-        ) as resp:
-            if resp.status_code != 200:
-                err_detail = resp.text[:300]
-                logger.error("LLM stream error %s: %s", resp.status_code, err_detail)
-                raise LLMError(f"HTTP {resp.status_code}: {err_detail}")
+    with httpx.Client(timeout=90) as client, client.stream(
+        "POST",
+        url,
+        headers={
+            "Authorization": f"Bearer {settings.llm_api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": settings.llm_model,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Contexto:\n{context}\n\nPregunta: {question}"},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 2048,
+            "stream": True,
+        },
+    ) as resp:
+        if resp.status_code != 200:
+            err_detail = resp.text[:300]
+            logger.error("LLM stream error %s: %s", resp.status_code, err_detail)
+            raise LLMError(f"HTTP {resp.status_code}: {err_detail}")
 
-            for line in resp.iter_lines():
-                if line.startswith("data: "):
-                    data_str = line[6:]
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        chunk = json.loads(data_str)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            yield content
-                    except Exception:
-                        continue
+        for line in resp.iter_lines():
+            if line.startswith("data: "):
+                data_str = line[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        yield content
+                except Exception:
+                    continue
 
     sources = _collect_sources(retrieved)
     repo_name = retrieved[0]["metadata"].get("repo_name") if retrieved else None

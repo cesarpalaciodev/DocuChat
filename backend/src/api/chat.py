@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from src.core import database as db
 from src.models.schemas import ChatRequest, ChatResponse, SourceDocument
 from src.rag.chain import query, query_stream
-from src.utils.exceptions import DocuChatError, RepoNotFoundError, LLMError
+from src.utils.exceptions import DocuChatError, LLMError, RepoNotFoundError
 from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -68,7 +68,12 @@ async def chat_stream(body: ChatRequest):
                         done_data = json.loads(token)
                         sources = done_data.get("sources", [])
                         db.message_add(conv_id, "assistant", full_answer, sources)
-                        yield f"data: {json.dumps({'done': True, 'conv_id': conv_id, 'repo_name': done_data.get('repo_name'), 'sources': sources})}\n\n"
+                        done_payload = json.dumps({
+                            "done": True, "conv_id": conv_id,
+                            "repo_name": done_data.get("repo_name"),
+                            "sources": sources,
+                        })
+                        yield f"data: {done_payload}\n\n"
                     except Exception:
                         pass
                     break
