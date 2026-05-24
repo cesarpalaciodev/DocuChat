@@ -2,6 +2,7 @@ import asyncio
 import re
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -67,7 +68,7 @@ async def add_repository(body: RepoRequest) -> RepoResponse:
 
 
 @router.get("/{repo_id}/status")
-async def repo_status(repo_id: str) -> dict:
+async def repo_status(repo_id: str) -> dict[str, Any]:
     repo = db.repo_get(repo_id)
     if repo is None:
         raise RepoNotFoundError(repo_id)
@@ -79,12 +80,12 @@ async def repo_status(repo_id: str) -> dict:
 
 
 @router.get("/")
-async def list_repos() -> list[dict]:
+async def list_repos() -> list[dict[str, Any]]:
     return db.repo_list()
 
 
 @router.delete("/{repo_id}")
-async def delete_repository(repo_id: str) -> dict:
+async def delete_repository(repo_id: str) -> dict[str, str]:
     deleted = vector_store.delete(repo_id)
     db_deleted = db.repo_delete(repo_id)
     if not deleted and not db_deleted:

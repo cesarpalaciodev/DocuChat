@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from typing import Any
+from collections.abc import Callable
 
 from src.api import api_router
 from src.core.config import settings
@@ -21,7 +24,7 @@ MAX_BODY_SIZE = 10 * 1024 * 1024
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings.vector_store_path.mkdir(parents=True, exist_ok=True)
     settings.clone_path.mkdir(parents=True, exist_ok=True)
     import shutil
@@ -58,7 +61,7 @@ app.include_router(api_router)
 
 
 @app.middleware("http")
-async def request_validation(request: Request, call_next):
+async def request_validation(request: Request, call_next: Callable[[Request], Any]) -> Any:
     if request.method in ("POST", "PUT"):
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > MAX_BODY_SIZE:
@@ -82,7 +85,7 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 
 @app.get("/api/health")
-async def health():
+async def health() -> dict[str, str]:
     return {"status": "ok", "version": "1.0.0"}
 
 
@@ -90,7 +93,7 @@ if STATIC_DIR.exists() and list(STATIC_DIR.glob("index.html")):
     app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
     @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
+    async def serve_spa(full_path: str) -> FileResponse:
         file_path = STATIC_DIR / full_path
         if full_path and file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
