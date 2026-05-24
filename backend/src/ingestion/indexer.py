@@ -31,7 +31,7 @@ class NumpyVectorStore:
         repos = db.repo_list()
         return [r["id"] for r in repos if self._repo_exists(r["id"])]
 
-    def index(self, repo_id: str, repo_url: str, repo_name: str, chunks: list[dict]) -> int:
+    def index(self, repo_id: str, repo_url: str, repo_name: str, chunks: list[dict[str, object]]) -> int:
         texts = [c["content"] for c in chunks]
 
         embedder = TfidfEmbedder()
@@ -62,25 +62,25 @@ class NumpyVectorStore:
         logger.info("Vectors saved: %s (%d chunks in %d shards)", repo_id, len(chunks), len(self._shard_glob(repo_id)))
         return len(chunks)
 
-    def search(self, query_text: str, repo_id: str | None, top_k: int) -> list[dict]:
+    def search(self, query_text: str, repo_id: str | None, top_k: int) -> list[dict[str, object]]:
         cache_key = f"{query_text}|{repo_id}|{top_k}"
         cached = _search_cache.get(cache_key)
         if cached is not None:
             return cached  # type: ignore[return-value]
 
         if repo_id and self._repo_exists(repo_id):
-            results = self._search_in_repo(query_text, repo_id, top_k)
+            result_list = self._search_in_repo(query_text, repo_id, top_k)
         else:
-            results: list[dict] = []
+            result_list: list[dict[str, object]] = []
             for rid in self._get_repo_ids():
-                results.extend(self._search_in_repo(query_text, rid, top_k))
-            results.sort(key=lambda x: x["score"], reverse=True)
-            results = results[:top_k]
+                result_list.extend(self._search_in_repo(query_text, rid, top_k))
+            result_list.sort(key=lambda x: x["score"], reverse=True)
+            result_list = result_list[:top_k]
 
-        _search_cache.set(cache_key, results)
-        return results
+        _search_cache.set(cache_key, result_list)
+        return result_list
 
-    def _search_in_repo(self, query_text: str, repo_id: str, top_k: int) -> list[dict]:
+    def _search_in_repo(self, query_text: str, repo_id: str, top_k: int) -> list[dict[str, object]]:
         shards = self._shard_glob(repo_id)
         if not shards:
             return []

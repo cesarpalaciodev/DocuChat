@@ -1,16 +1,16 @@
 import asyncio
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
 from src.core import database as db
 from src.core.config import settings
-from src.ingestion.loader import ingest_repository
 from src.ingestion.indexer import vector_store
+from src.ingestion.loader import ingest_repository
 from src.models.schemas import RepoRequest, RepoResponse
-from src.utils.exceptions import RepoCloneError, RepoNotFoundError, IndexingError
+from src.utils.exceptions import IndexingError, RepoNotFoundError
 from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
@@ -62,12 +62,12 @@ async def add_repository(body: RepoRequest) -> RepoResponse:
         name=repo_name,
         indexed_documents=0,
         status="indexing",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
 
 
 @router.get("/{repo_id}/status")
-async def repo_status(repo_id: str) -> dict:
+async def repo_status(repo_id: str) -> dict[str, object]:
     repo = db.repo_get(repo_id)
     if repo is None:
         raise RepoNotFoundError(repo_id)
@@ -79,12 +79,12 @@ async def repo_status(repo_id: str) -> dict:
 
 
 @router.get("/")
-async def list_repos() -> list[dict]:
+async def list_repos() -> list[dict[str, object]]:
     return db.repo_list()
 
 
 @router.delete("/{repo_id}")
-async def delete_repository(repo_id: str) -> dict:
+async def delete_repository(repo_id: str) -> dict[str, str]:
     deleted = vector_store.delete(repo_id)
     db_deleted = db.repo_delete(repo_id)
     if not deleted and not db_deleted:

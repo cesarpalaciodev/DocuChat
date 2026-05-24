@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +62,7 @@ def repo_create(repo_id: str, url: str, name: str, branch: str) -> None:
     conn = get_db()
     conn.execute(
         "INSERT INTO repos (id, url, name, branch, status, created_at) VALUES (?, ?, ?, ?, 'indexing', ?)",
-        (repo_id, url, name, branch, datetime.now(timezone.utc).isoformat()),
+        (repo_id, url, name, branch, datetime.now(UTC).isoformat()),
     )
     conn.commit()
     conn.close()
@@ -107,7 +107,7 @@ def conversation_create(conversation_id: str, repo_id: str | None) -> None:
     conn = get_db()
     conn.execute(
         "INSERT INTO conversations (id, repo_id, created_at) VALUES (?, ?, ?)",
-        (conversation_id, repo_id, datetime.now(timezone.utc).isoformat()),
+        (conversation_id, repo_id, datetime.now(UTC).isoformat()),
     )
     conn.commit()
     conn.close()
@@ -125,11 +125,11 @@ def conversation_list(repo_id: str | None = None) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def message_add(conversation_id: str, role: str, content: str, sources: list[dict] | None = None) -> int:
+def message_add(conversation_id: str, role: str, content: str, sources: list[dict[str, object]] | None = None) -> int:
     conn = get_db()
     cursor = conn.execute(
         "INSERT INTO messages (conversation_id, role, content, sources, created_at) VALUES (?, ?, ?, ?, ?)",
-        (conversation_id, role, content, json.dumps(sources or []), datetime.now(timezone.utc).isoformat()),
+        (conversation_id, role, content, json.dumps(sources or []), datetime.now(UTC).isoformat()),
     )
     conn.commit()
     msg_id = cursor.lastrowid
