@@ -1,7 +1,7 @@
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request, Response
 
@@ -29,4 +29,4 @@ class RateLimiter:
             )
 
         bucket.append(now)
-        return await call_next(request)  # type: ignore[return-value]
+        return cast(Response, await call_next(request))
