@@ -12,6 +12,8 @@ _BLOCKED_PATTERNS = [
 ]
 _BLOCKED_RE = re.compile("|".join(_BLOCKED_PATTERNS), re.IGNORECASE)
 
+_ID_RE = re.compile(r"^[a-f0-9]{8,64}$")
+
 
 def _validate_url(url: str) -> str:
     url = url.strip()
@@ -41,6 +43,14 @@ def _validate_url(url: str) -> str:
         pass
 
     return url
+
+
+def _validate_id(v: str | None, label: str) -> str | None:
+    if v is None:
+        return None
+    if not _ID_RE.match(v):
+        raise ValueError(f"{label} must be 8-64 hex characters")
+    return v
 
 
 class RepoRequest(BaseModel):
@@ -73,6 +83,16 @@ class ChatRequest(BaseModel):
             raise ValueError("Question cannot be empty")
         return v.strip()[:5000]
 
+    @field_validator("repo_id")
+    @classmethod
+    def repo_id_valid(cls, v: str | None) -> str | None:
+        return _validate_id(v, "repo_id")
+
+    @field_validator("conversation_id")
+    @classmethod
+    def conv_id_valid(cls, v: str | None) -> str | None:
+        return _validate_id(v, "conversation_id")
+
 
 class SourceDocument(BaseModel):
     file_path: str
@@ -97,6 +117,11 @@ class SearchRequest(BaseModel):
         if not v.strip():
             raise ValueError("Query cannot be empty")
         return v.strip()[:5000]
+
+    @field_validator("repo_id")
+    @classmethod
+    def repo_id_valid(cls, v: str | None) -> str | None:
+        return _validate_id(v, "repo_id")
 
     @field_validator("top_k")
     @classmethod
