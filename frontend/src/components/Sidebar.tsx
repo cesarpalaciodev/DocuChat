@@ -1,8 +1,14 @@
 import { useEffect, useState, useCallback } from "react"
-import { listRepos, deleteRepo, Repo } from "../lib/api"
+import { listRepos, deleteRepo, Repo, listConversations, deleteConversation, Conversation } from "../lib/api"
 import RepoUpload from "./RepoUpload"
 
-export const STYLE = {
+interface Props {
+  selectedRepo: string | null
+  onSelectRepo: (id: string | null) => void
+  onLoadConversation: (id: string) => void
+}
+
+const STYLE = {
   aside: "w-80 h-screen flex flex-col border-r",
   border: "border-[var(--border-dim)]",
   bg: "bg-[var(--bg-panel)]",
@@ -23,11 +29,6 @@ export const STYLE = {
   red: "text-[var(--accent-red)] hover:text-[#ee6666]",
 } as const
 
-interface Props {
-  selectedRepo: string | null
-  onSelectRepo: (id: string | null) => void
-}
-
 function useRepos() {
   const [repos, setRepos] = useState<Repo[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +45,7 @@ function useRepos() {
   return { repos, loading, refetch: fetchRepos, setRepos }
 }
 
-export default function Sidebar({ selectedRepo, onSelectRepo }: Props) {
+export default function Sidebar({ selectedRepo, onSelectRepo, onLoadConversation }: Props) {
   const { repos, loading, refetch } = useRepos()
 
   async function handleDelete(id: string, e: React.MouseEvent) {
@@ -53,6 +54,22 @@ export default function Sidebar({ selectedRepo, onSelectRepo }: Props) {
       await deleteRepo(id)
       if (selectedRepo === id) onSelectRepo(null)
       refetch()
+    } catch { /* silent */ }
+  }
+
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const fetchConvs = useCallback(async () => {
+    try {
+      setConversations(await listConversations())
+    } catch { /* silent */ }
+  }, [])
+  useEffect(() => { fetchConvs() }, [fetchConvs])
+
+  async function handleDeleteConv(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await deleteConversation(id)
+      fetchConvs()
     } catch { /* silent */ }
   }
 
@@ -78,7 +95,11 @@ export default function Sidebar({ selectedRepo, onSelectRepo }: Props) {
           <span className="w-2 h-2 rounded-full bg-[var(--accent-green)] inline-block" />
           system operational
           <button
-            onClick={() => document.documentElement.classList.toggle("light")}
+            onClick={() => {
+              const html = document.documentElement
+              html.classList.toggle("light")
+              localStorage.setItem("theme", html.classList.contains("light") ? "light" : "dark")
+            }}
             className="ml-auto px-2 py-0.5 border border-[var(--border-dim)] hover:border-[var(--accent-amber)] text-[var(--text-dim)] hover:text-[var(--accent-amber)] transition-colors text-[9px] uppercase tracking-wider"
             title="Toggle theme"
             aria-label="Toggle dark/light theme"
@@ -166,10 +187,47 @@ export default function Sidebar({ selectedRepo, onSelectRepo }: Props) {
         </div>
       </div>
 
+      {/* Conversations */}
+      <div className="border-t border-[var(--border-dim)] px-4 py-3">
+        <h3 className="text-[10px] text-[var(--text-dim)] uppercase tracking-[0.2em] font-bold mb-2">
+          conversations ({conversations.length})
+        </h3>
+        {conversations.length === 0 ? (
+          <p className="text-[11px] text-[var(--text-dim)] italic">&lt;no history&gt;</p>
+        ) : (
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {conversations.slice(0, 20).map((conv) => (
+              <div
+                key={conv.id}
+                className="flex items-center justify-between px-3 py-1.5 border border-[var(--border-dim)] hover:border-[var(--border-glow)] transition-colors group cursor-pointer"
+                onClick={() => onLoadConversation(conv.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Load conversation ${conv.id}`}
+              >
+                <span className="text-[11px] text-[var(--text-primary)] font-mono truncate">
+                  {conv.id.slice(0, 10)}...
+                </span>
+                <span
+                  onClick={(e) => handleDeleteConv(conv.id, e)}
+                  className="ml-1 p-0.5 opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--accent-red)] transition-all cursor-pointer text-[10px]"
+                  title="Delete conversation"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Delete conversation ${conv.id}`}
+                >
+                  ×
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-[var(--border-dim)] text-[10px] text-[var(--text-dim)] font-mono flex items-center justify-between">
-        <span>langchain + chromadb</span>
-        <span>groq/llama3</span>
+      <div className="px-5 py-2 border-t border-[var(--border-dim)] text-[10px] text-[var(--text-dim)] font-mono flex items-center justify-between shrink-0">
+        <span>tf-idf + numpy</span>
+        <span>openrouter</span>
       </div>
     </aside>
   )

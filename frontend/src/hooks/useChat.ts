@@ -95,5 +95,12 @@ export function useChat() {
     convIdRef.current = null
   }, [])
 
-  return { messages, loading, error, ask, clear }
+  const loadMessages = useCallback((msgs: Message[]) => {
+    if (abortRef.current) abortRef.current.abort()
+    setMessages(msgs)
+    setError(null)
+    convIdRef.current = null
+  }, [])
+
+  return { messages, loading, error, ask, clear, loadMessages }
 }
