@@ -25,7 +25,10 @@ class RateLimiter:
 
     async def __call__(self, request: Request, call_next: Callable[..., Any]) -> Response:
         forwarded = request.headers.get("X-Forwarded-For")
-        api_key = request.headers.get("X-API-Key", "") or request.headers.get("Authorization", "").replace("Bearer ", "")
+        api_key = (
+            request.headers.get("X-API-Key", "")
+            or request.headers.get("Authorization", "").replace("Bearer ", "")
+        )
         if api_key:
             key = f"key:{api_key[:16]}"
         elif forwarded:
