@@ -1,10 +1,10 @@
 import time
-from collections import defaultdict, deque
 from collections.abc import Callable
+from collections import defaultdict, deque
 from typing import Any
 
-from fastapi import Request, Response
 from fastapi.responses import JSONResponse
+from fastapi import Request, Response
 
 
 _BUCKETS: dict[str, deque[float]] = defaultdict(lambda: deque())
@@ -94,9 +94,7 @@ class TieredRateLimiter:
             tier = "light"
         elif path in ("/api/chat/", "/api/chat/stream", "/api/search/"):
             tier = "heavy"
-        elif path == "/api/repos/" and request.method == "POST":
-            tier = "expense"
-        elif path.startswith("/api/repos/") and request.method == "DELETE":
+        elif path.startswith("/api/repos/") and request.method in ("POST", "DELETE"):
             tier = "expense"
         elif path.startswith("/api/chat/"):
             tier = "medium"
