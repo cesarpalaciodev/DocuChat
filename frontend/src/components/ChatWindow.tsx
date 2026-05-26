@@ -69,7 +69,7 @@ export default function ChatWindow({ selectedRepo, loadHistory }: Props) {
         {messages.length > 0 && (
           <button
             onClick={clear}
-            className="flex items-center gap-2 px-4 py-2 text-[11px] text-[var(--text-dim)] hover:text-[var(--accent-red)] border border-[var(--border-dim)] hover:border-[var(--accent-red)]/30 transition-colors font-mono uppercase tracking-wider"
+            className="flex items-center gap-2 px-4 py-2 text-[11px] text-[var(--text-dim)] hover:text-[var(--accent-red)] border border-[var(--border-dim)] hover:border-[var(--accent-red)]/30 transition-all duration-200 cursor-pointer font-mono uppercase tracking-wider focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-amber)]"
             aria-label="Clear chat"
           >
             clear
