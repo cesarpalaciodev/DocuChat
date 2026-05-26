@@ -1,7 +1,7 @@
+import sqlite3
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-import sqlite3
 from typing import Any
 
 from fastapi import FastAPI, Request
