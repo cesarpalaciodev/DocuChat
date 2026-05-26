@@ -7,26 +7,32 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![CI](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml)
 
-Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Uses **TF-IDF** + **numpy** + **SQLite** with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
+Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Supports both **TF-IDF** (local, no GPU) and **API embeddings** (semantic, via OpenAI-compatible API) with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
 
 ## Features
 
 - Clone and index code repositories (Markdown, source files, READMEs)
-- TF-IDF semantic search with cosine similarity (no GPU needed)
+- **Dual search**: TF-IDF (offline) or semantic API embeddings (`EMBEDDING_ENABLED=true`)
 - RAG-powered answers with source citations
-- **SSE streaming** â€” answers appear token by token
+- **SSE streaming** â€” answers appear token by token, with **Stop** button
 - **Multi-repository** support with cross-repo search
 - **Conversation history** persisted in SQLite
-- **Dark/light mode** toggle
-- **Keyboard shortcuts** (Ctrl+K focus input, Esc toggle)
-- **Rate limiting**, input validation, anti-path-traversal security
+- **Regenerate** last response
+- **Copy code** button on all code blocks
+- **Dark/light mode** with animated toggle
+- **Keyboard shortcuts** (âŒ˜K focus input, Esc toggle)
+- **Sidebar resizable** (240px - 500px)
+- **Mobile responsive** with slide-over drawer
+- **Rate limiting** by IP and API key, input validation, anti-path-traversal
+- **API key auth** (configurable via `AUTH_ENABLED=true`)
+- **Circuit breaker** for LLM and embedding APIs
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | LLM | Any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq) |
-| Embeddings | TF-IDF (numpy, pure Python, no GPU) |
+| Embeddings | TF-IDF (numpy) or API embeddings (text-embedding-3-small) |
 | Vector Store | Numpy `.npz` sharded by 2000 vectors |
 | Database | SQLite (WAL mode) for repos + conversations |
 | Backend | FastAPI + Uvicorn |
@@ -98,11 +104,12 @@ docker-compose up
 | **Security Headers** | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`. |
 | **Git Clone** | Disabled hooks (`GIT_TERMINAL_PROMPT=0`, `GIT_ASKPASS=echo`). Symlink detection. Binary file detection. Cleanup in `finally` block. |
 | **Logging** | Rotating 10MB/5 backup files. Secrets redaction filter (`sk-*`, `Bearer`, `api_key`). No secrets exposed in logs. |
-| **LLM API** | Exponential backoff retry (1s/2s/4s) on 429/502/503/504. Connection pooling with `httpx.Client`. Configurable timeouts. |
+| **LLM API** | Exponential backoff retry (1s/2s/4s) on 429/502/503/504. Connection pooling with `httpx.Client`. Circuit breaker (opens after 3 failures/30s). Configurable timeouts. |
 | **Markdown** | Frontend validates link protocols (`http:`, `https:`, `mailto:` only). `javascript:` and dangerous URLs blocked. |
 | **Database** | Parameterized queries (SQL injection immune). WAL mode. Connection timeout. Foreign keys enforced. |
-| **Docker** | Non-root `appuser`. `--proxy-headers` enabled. Read-only where possible. |
+| **Docker** | Non-root `appuser`. `--proxy-headers` enabled. Multi-worker via gunicorn (configurable `WORKERS` env). |
 | **CORS** | Configurable via `CORS_ORIGINS` env var. Methods restricted to GET/POST/DELETE. Headers restricted. |
+| **API Key Auth** | Optional middleware. Supports `Authorization: Bearer <key>` or `X-API-Key: <key>`. Public paths (health, assets) excluded. |
 
 ## Configuration (.env)
 
