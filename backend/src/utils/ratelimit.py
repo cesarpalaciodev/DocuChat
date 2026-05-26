@@ -3,7 +3,7 @@
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -58,7 +58,7 @@ class RateLimiter:
         response.headers["X-RateLimit-Limit"] = str(self.requests)
         response.headers["X-RateLimit-Remaining"] = str(remaining - 1)
         response.headers["X-RateLimit-Reset"] = str(reset_at)
-        return response
+        return cast(Response, response)
 
 
 _RATE_MAP: dict[str, str] = {
