@@ -68,15 +68,16 @@ class NumpyVectorStore:
         tfidf_embedder = TfidfEmbedder()
         tfidf_embedder.fit(texts)
 
-        all_vectors = [tfidf_embedder._vectorize(t) for t in texts]
+        tfidf_vectors = [tfidf_embedder._vectorize(t) for t in texts]
+        all_vectors_for_save = tfidf_vectors
 
         metadatas = [
             {**c["metadata"], "repo_id": repo_id, "repo_name": repo_name}
             for c in chunks
         ]
 
-        for shard_idx, i in enumerate(range(0, len(all_vectors), _SHARD_SIZE)):
-            batch_vecs = all_vectors[i : i + _SHARD_SIZE]
+        for shard_idx, i in enumerate(range(0, len(all_vectors_for_save), _SHARD_SIZE)):
+            batch_vecs = all_vectors_for_save[i : i + _SHARD_SIZE]
             batch_texts = texts[i : i + _SHARD_SIZE]
             batch_metas = metadatas[i : i + _SHARD_SIZE]
 
