@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request, Response
 
@@ -22,4 +22,4 @@ class SecurityHeadersMiddleware:
             "connect-src 'self'; "
             "frame-ancestors 'none'"
         )
-        return response
+        return cast(Response, response)
