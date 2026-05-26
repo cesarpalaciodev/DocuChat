@@ -1,10 +1,10 @@
 import time
-from collections.abc import Callable
 from collections import defaultdict, deque
+from collections.abc import Callable
 from typing import Any
 
-from fastapi.responses import JSONResponse
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 
 
 _BUCKETS: dict[str, deque[float]] = defaultdict(lambda: deque())

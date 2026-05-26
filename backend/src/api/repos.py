@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from src.core import database as db
 from src.core.config import settings
 from src.ingestion.indexer import vector_store
-from src.ingestion.loader import ingest_repository, _on_rm_error
+from src.ingestion.loader import _on_rm_error, ingest_repository
 from src.models.schemas import RepoRequest, RepoResponse
 from src.utils.exceptions import IndexingError, RepoNotFoundError
 from src.utils.logging import setup_logger
