@@ -91,7 +91,7 @@
   }
 
   .cursor-blink::after {
-    content: "▮";
+    content: "â–®";
     animation: blink 1s step-end infinite;
     color: var(--accent-amber);
   }
@@ -126,4 +126,18 @@
     0%, 60%, 100% { opacity: 0.25; transform: scale(0.8); }
     30% { opacity: 1; transform: scale(1.2); }
   }
+
+  .focus-ring {
+    outline: 2px solid var(--accent-amber);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-enter { animation: none; }
+  .pulse-glow { animation: none; text-shadow: none; }
+  .crt-overlay { animation: none; opacity: 0 !important; }
+  .typing-dot { animation: none; opacity: 1; }
+  .cursor-blink::after { animation: none; opacity: 0; }
+  body { background-image: none; }
 }

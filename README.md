@@ -14,7 +14,7 @@ Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documen
 - Clone and index code repositories (Markdown, source files, READMEs)
 - TF-IDF semantic search with cosine similarity (no GPU needed)
 - RAG-powered answers with source citations
-- **SSE streaming** — answers appear token by token
+- **SSE streaming** â€” answers appear token by token
 - **Multi-repository** support with cross-repo search
 - **Conversation history** persisted in SQLite
 - **Dark/light mode** toggle
@@ -94,7 +94,7 @@ docker-compose up
 | **Prompt Injection** | Blocks 20+ injection patterns (`"ignore all instructions"`, `"<\|im_start\|>"`, role redefinition). Context wrapped in XML tags to isolate from system prompt. |
 | **Input Validation** | All IDs validated with regex (`[a-f0-9]{8,64}`). URL allowlist. Path traversal blocked (12 patterns). Body size limit 10MB. |
 | **Rate Limiting** | 4 tiers per endpoint: light (health 300rpm), medium (list 60rpm), heavy (chat/search 20rpm), expense (clone 5rpm). `Retry-After` and `X-RateLimit-*` headers. Stale bucket cleanup. |
-| **Error Handling** | Sanitized errors — no stack traces, no raw LLM errors, no internal paths leaked to client. Full tracebacks logged server-side only. |
+| **Error Handling** | Sanitized errors â€” no stack traces, no raw LLM errors, no internal paths leaked to client. Full tracebacks logged server-side only. |
 | **Security Headers** | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`. |
 | **Git Clone** | Disabled hooks (`GIT_TERMINAL_PROMPT=0`, `GIT_ASKPASS=echo`). Symlink detection. Binary file detection. Cleanup in `finally` block. |
 | **Logging** | Rotating 10MB/5 backup files. Secrets redaction filter (`sk-*`, `Bearer`, `api_key`). No secrets exposed in logs. |
@@ -139,29 +139,29 @@ LLM_MAX_RETRIES=2
 
 ```
 docu-chat/
-├── backend/
-│   ├── src/
-│   │   ├── api/              # FastAPI routes (chat, repos)
-│   │   ├── core/             # Settings, database, config
-│   │   ├── ingestion/        # Repo cloning, chunking, TF-IDF embedding
-│   │   ├── rag/              # Search + LLM query + streaming
-│   │   ├── models/           # Pydantic schemas with validation
-│   │   ├── utils/            # Logging, exceptions, rate limit, cache
-│   │   └── main.py           # Entry point with middleware
-│   ├── tests/
-│   │   ├── test_api.py       # Integration tests (FastAPI)
-│   │   ├── test_security.py  # Security validation tests
-│   │   ├── test_embedder.py  # TF-IDF unit tests
-│   │   ├── test_rag.py       # RAG chain tests
-│   │   └── ...
-│   └── pyproject.toml
-├── frontend/
-│   ├── src/
-│   │   ├── components/       # ChatWindow, Sidebar, Toast, ErrorBoundary
-│   │   ├── hooks/            # useChat (SSE streaming, AbortController)
-│   │   └── lib/              # API client + SSE stream parser
-│   └── package.json
-└── .env.example
+â”œâ”€â”€ backend/
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ api/              # FastAPI routes (chat, repos)
+â”‚   â”‚   â”œâ”€â”€ core/             # Settings, database, config
+â”‚   â”‚   â”œâ”€â”€ ingestion/        # Repo cloning, chunking, TF-IDF embedding
+â”‚   â”‚   â”œâ”€â”€ rag/              # Search + LLM query + streaming
+â”‚   â”‚   â”œâ”€â”€ models/           # Pydantic schemas with validation
+â”‚   â”‚   â”œâ”€â”€ utils/            # Logging, exceptions, rate limit, cache
+â”‚   â”‚   â””â”€â”€ main.py           # Entry point with middleware
+â”‚   â”œâ”€â”€ tests/
+â”‚   â”‚   â”œâ”€â”€ test_api.py       # Integration tests (FastAPI)
+â”‚   â”‚   â”œâ”€â”€ test_security.py  # Security validation tests
+â”‚   â”‚   â”œâ”€â”€ test_embedder.py  # TF-IDF unit tests
+â”‚   â”‚   â”œâ”€â”€ test_rag.py       # RAG chain tests
+â”‚   â”‚   â””â”€â”€ ...
+â”‚   â””â”€â”€ pyproject.toml
+â”œâ”€â”€ frontend/
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ components/       # ChatWindow, Sidebar, Toast, ErrorBoundary
+â”‚   â”‚   â”œâ”€â”€ hooks/            # useChat (SSE streaming, AbortController)
+â”‚   â”‚   â””â”€â”€ lib/              # API client + SSE stream parser
+â”‚   â””â”€â”€ package.json
+â””â”€â”€ .env.example
 ```
 
 ## Running Tests
@@ -170,3 +170,20 @@ docu-chat/
 cd backend
 python -m pytest tests/ -v
 ```
+
+## Roadmap â€” Lo que mÃ¡s subirÃ­a el proyecto
+
+### 1. Demo pÃºblica â­â­â­â­â­
+Una demo en vivo (Vercel/Railway) con 1-2 repos pre-indexados para que cualquiera pruebe sin instalar nada. Impacto inmediato en adopciÃ³n.
+
+### 2. Streaming tipo ChatGPT â­â­â­â­â­
+Ya implementado (SSE vÃ­a `/api/chat/stream`). Mejora pendiente: abortar generaciÃ³n a mitad de stream, reanudar conversaciones interrumpidas.
+
+### 3. Multi-user + Auth â­â­â­â­
+JWT o Clerk/Auth.js. Cada usuario con sus propios repos, conversaciones, y rate limits. Esto lo acerca a SaaS.
+
+### 4. Vector DB seria â­â­â­â­
+Migrar de TF-IDF + numpy a Qdrant, Pinecone, Weaviate o pgvector. Ventajas: bÃºsqueda semÃ¡ntica real, filtros avanzados, escalabilidad, multi-tenant nativo.
+
+### 5. Observabilidad â­â­â­
+MÃ©tricas (Prometheus), tracing (OpenTelemetry), logs estructurados, dashboard de uso. Esencial para producciÃ³n con mÃºltiples usuarios.
