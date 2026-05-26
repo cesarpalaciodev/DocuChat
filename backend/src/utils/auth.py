@@ -10,7 +10,7 @@ _PUBLIC_PREFIXES = ("/assets/",)
 
 
 class ApiKeyMiddleware:
-    async def __call__(self, request: Request, call_next: Any) -> Response:  # type: ignore[override]
+    async def __call__(self, request: Request, call_next: Any) -> Response:
         if not settings.auth_enabled or not settings.api_key:
             return cast(Response, await call_next(request))
 
