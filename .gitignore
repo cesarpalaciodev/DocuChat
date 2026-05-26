@@ -13,4 +13,5 @@ logs/
 *.egg-info/
 .vite/
 *.bak
+*.tsbuildinfo
 /tmp/
