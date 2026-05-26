@@ -6,7 +6,7 @@ import numpy as np
 
 from src.core import database as db
 from src.core.config import settings
-from src.ingestion.embedder import TfidfEmbedder
+from src.ingestion.embedder import TfidfEmbedder, ApiEmbedder
 from src.utils.cache import _search_cache
 from src.utils.logging import setup_logger
 
@@ -34,6 +34,36 @@ class NumpyVectorStore:
 
     def index(self, repo_id: str, repo_url: str, repo_name: str, chunks: list[dict[str, Any]]) -> int:
         texts: list[str] = [str(c["content"]) for c in chunks]
+
+        if settings.embedding_enabled:
+            embedder = ApiEmbedder()
+            batch_size = 50
+            all_vectors: list[list[float]] = []
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i : i + batch_size]
+                all_vectors.extend(embedder.embed(batch))
+                logger.debug("Embedded batch %d/%d", i + len(batch), len(texts))
+
+            metadatas = [
+                {**c["metadata"], "repo_id": repo_id, "repo_name": repo_name, "embedding_type": "api"}
+                for c in chunks
+            ]
+
+            for shard_idx, i in enumerate(range(0, len(all_vectors), _SHARD_SIZE)):
+                batch_vecs = all_vectors[i : i + _SHARD_SIZE]
+                batch_texts = texts[i : i + _SHARD_SIZE]
+                batch_metas = metadatas[i : i + _SHARD_SIZE]
+
+                vectors = np.array(batch_vecs, dtype=np.float32)
+                np.savez_compressed(
+                    self._shard_path(repo_id, shard_idx),
+                    vectors=vectors,
+                    texts=np.array(batch_texts, dtype=object),
+                    metadatas=np.array(batch_metas, dtype=object),
+                    embedding_type="api",
+                )
+            logger.info("API vectors saved: %s (%d chunks)", repo_id, len(chunks))
+            return len(chunks)
 
         embedder = TfidfEmbedder()
         embedder.fit(texts)
@@ -87,13 +117,19 @@ class NumpyVectorStore:
             return []
 
         data = np.load(shards[0], allow_pickle=True)
-        word_to_idx: dict[str, int] = json.loads(str(data["word_to_idx"]))
-        idf: np.ndarray = data["idf"]
+        is_api_embedding = str(data.get("embedding_type", "")) == "api"
 
-        embedder = TfidfEmbedder()
-        embedder._word_to_idx = word_to_idx
-        embedder._idf = idf
-        query_vec = embedder._vectorize(query_text)
+        if is_api_embedding:
+            embedder = ApiEmbedder()
+            query_vec = np.array(embedder.embed(query_text)[0], dtype=np.float32)
+        else:
+            import json as _json
+            word_to_idx: dict[str, int] = _json.loads(str(data["word_to_idx"]))
+            idf: np.ndarray = data["idf"]
+            embedder = TfidfEmbedder()
+            embedder._word_to_idx = word_to_idx
+            embedder._idf = idf
+            query_vec = embedder._vectorize(query_text)
 
         all_candidates: list[tuple[float, str, dict[str, Any]]] = []
 
