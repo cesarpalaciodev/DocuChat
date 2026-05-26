@@ -11,8 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from src.api import api_router
 from src.core.config import settings
 from src.utils.exceptions import DocuChatError
+from src.utils.headers import SecurityHeadersMiddleware
 from src.utils.logging import setup_logger
-from src.utils.ratelimit import RateLimiter
+from src.utils.ratelimit import TieredRateLimiter
 
 logger = setup_logger("main")
 
@@ -48,13 +49,22 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://localhost:5173"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
-app.middleware("http")(RateLimiter(requests=60, window=60))
+if settings.rate_limit_enabled:
+    app.middleware("http")(TieredRateLimiter(
+        light_rpm=settings.rate_light_rpm,
+        medium_rpm=settings.rate_medium_rpm,
+        heavy_rpm=settings.rate_heavy_rpm,
+        expense_rpm=settings.rate_expense_rpm,
+        window=settings.rate_window_seconds,
+    ))
+
+app.middleware("http")(SecurityHeadersMiddleware())
 
 app.include_router(api_router)
 
@@ -73,13 +83,13 @@ async def request_validation(request: Request, call_next: Callable[[Request], An
 
 @app.exception_handler(DocuChatError)
 async def docuchat_error_handler(request: Request, exc: DocuChatError) -> JSONResponse:
-    logger.warning("%s: %s", type(exc).__name__, exc)
+    logger.warning("%s: %s (path=%s)", type(exc).__name__, str(exc)[:200], request.url.path)
     return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled error: %s", exc, exc_info=True)
+    logger.error("Unhandled error on %s: %s", request.url.path, exc, exc_info=True)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
