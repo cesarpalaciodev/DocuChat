@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 import time
 from collections import defaultdict, deque
 from collections.abc import Callable
