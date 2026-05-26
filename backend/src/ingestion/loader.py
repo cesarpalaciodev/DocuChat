@@ -50,10 +50,11 @@ def _clone_with_timeout(repo_url: str, clone_path: Path, branch: str | None = No
 
     def _clone() -> None:
         try:
+            env = {"GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "echo"}
             if branch:
-                Repo.clone_from(repo_url, str(clone_path), branch=branch, depth=1)
+                Repo.clone_from(repo_url, str(clone_path), branch=branch, depth=1, env=env)
             else:
-                Repo.clone_from(repo_url, str(clone_path), depth=1)
+                Repo.clone_from(repo_url, str(clone_path), depth=1, env=env)
         except Exception as e:
             result[0] = e
 
@@ -114,6 +115,8 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
                 return docs
 
             filepath = os.path.join(root, filename)
+            if os.path.islink(filepath):
+                continue
             if Path(filename).suffix.lower() not in _TEXT_EXTENSIONS:
                 continue
 
@@ -130,6 +133,9 @@ def _load_documents(clone_path: str) -> list[dict[str, Any]]:
             except Exception:
                 continue
             if not content.strip():
+                continue
+
+            if "\x00" in content[:1024]:
                 continue
 
             relative_path = os.path.relpath(filepath, clone_path)
@@ -160,36 +166,38 @@ def chunk_text(text: str, chunk_size: int, overlap: int, max_chunks: int = _MAX_
 
 def ingest_repository(repo_url: str, branch: str = "main") -> dict[str, Any]:
     repo_uuid, repo_name, clone_path = _clone_repo(repo_url, branch)
-    documents = _load_documents(clone_path)
 
-    total_chunks = 0
-    chunks: list[dict[str, Any]] = []
-    for doc in documents:
-        doc_chunks = chunk_text(doc["content"], settings.chunk_size, settings.chunk_overlap)
-        for i, c in enumerate(doc_chunks):
-            if total_chunks >= settings.max_total_chunks:
-                logger.warning("Max total chunks reached (%d)", settings.max_total_chunks)
-                return {
-                    "id": repo_uuid,
-                    "url": repo_url,
-                    "branch": branch,
-                    "name": repo_name,
-                    "chunks": chunks,
-                }
-            chunks.append({
-                "content": c,
-                "metadata": {**doc["metadata"], "chunk_index": i},
-            })
-            total_chunks += 1
+    try:
+        documents = _load_documents(clone_path)
 
-    from contextlib import suppress
-    with suppress(Exception):
-        shutil.rmtree(clone_path, onerror=_on_rm_error)
+        total_chunks = 0
+        chunks: list[dict[str, Any]] = []
+        for doc in documents:
+            doc_chunks = chunk_text(doc["content"], settings.chunk_size, settings.chunk_overlap)
+            for i, c in enumerate(doc_chunks):
+                if total_chunks >= settings.max_total_chunks:
+                    logger.warning("Max total chunks reached (%d)", settings.max_total_chunks)
+                    return {
+                        "id": repo_uuid,
+                        "url": repo_url,
+                        "branch": branch,
+                        "name": repo_name,
+                        "chunks": chunks,
+                    }
+                chunks.append({
+                    "content": c,
+                    "metadata": {**doc["metadata"], "chunk_index": i},
+                })
+                total_chunks += 1
 
-    return {
-        "id": repo_uuid,
-        "url": repo_url,
-        "branch": branch,
-        "name": repo_name,
-        "chunks": chunks,
-    }
+        return {
+            "id": repo_uuid,
+            "url": repo_url,
+            "branch": branch,
+            "name": repo_name,
+            "chunks": chunks,
+        }
+    finally:
+        from contextlib import suppress
+        with suppress(Exception):
+            shutil.rmtree(clone_path, onerror=_on_rm_error)

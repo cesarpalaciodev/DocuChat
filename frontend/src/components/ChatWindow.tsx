@@ -1,16 +1,43 @@
 import { useState, useRef, useEffect, FormEvent } from "react"
 import ReactMarkdown from "react-markdown"
-import { useChat } from "../hooks/useChat"
+import type { Components } from "react-markdown"
+import { useChat, Message } from "../hooks/useChat"
 import SourceCitation from "./SourceCitation"
+
+function safeUrl(href: string | undefined) {
+  if (!href) return undefined
+  if (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:")) {
+    return href
+  }
+  return undefined
+}
+
+const markdownComponents: Components = {
+  a: ({ href, children, ...props }) => (
+    <a href={safeUrl(href)} target="_blank" rel="noopener noreferrer" {...props}>
+      {children}
+    </a>
+  ),
+}
 
 interface Props {
   selectedRepo: string | null
+  loadHistory: string | null
 }
 
-export default function ChatWindow({ selectedRepo }: Props) {
-  const { messages, loading, ask, clear } = useChat()
+export default function ChatWindow({ selectedRepo, loadHistory }: Props) {
+  const { messages, loading, ask, clear, loadMessages } = useChat()
   const [input, setInput] = useState("")
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (loadHistory) {
+      try {
+        const msgs: Message[] = JSON.parse(loadHistory)
+        loadMessages(msgs)
+      } catch { /* ignore */ }
+    }
+  }, [loadHistory, loadMessages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -68,7 +95,7 @@ export default function ChatWindow({ selectedRepo }: Props) {
                 y luego escribe tu pregunta abajo.
               </p>
               <p className="text-[10px] text-[var(--text-dim)] mt-4 font-mono">
-                powered by LangChain + ChromaDB + Groq/Llama3
+                powered by FastAPI + TF-IDF + OpenRouter
               </p>
             </div>
           </div>
@@ -116,7 +143,7 @@ export default function ChatWindow({ selectedRepo }: Props) {
                         [&_th]:border [&_th]:border-[var(--border-dim)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-[var(--text-bright)] [&_th]:bg-[var(--bg-terminal)]
                         [&_td]:border [&_td]:border-[var(--border-dim)] [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-[var(--text-primary)]"
                     >
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <p className="text-[13px] text-[var(--text-bright)] leading-relaxed font-mono whitespace-pre-wrap">
