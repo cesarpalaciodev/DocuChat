@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+import sqlite3
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -9,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api import api_router
+from src.core import database as db
 from src.core.config import settings
 from src.utils.auth import ApiKeyMiddleware
 from src.utils.exceptions import DocuChatError
@@ -99,8 +101,6 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 @app.get("/api/health")
 async def health() -> dict[str, object]:
-    from src.core import database as db
-    import sqlite3
     try:
         repos = db.repo_list()
         db_ok = True

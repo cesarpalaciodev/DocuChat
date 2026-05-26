@@ -1,3 +1,4 @@
+import json as _json
 from pathlib import Path
 from typing import Any
 
@@ -85,7 +86,7 @@ class NumpyVectorStore:
                 vectors=vectors,
                 texts=np.array(batch_texts, dtype=object),
                 metadatas=np.array(batch_metas, dtype=object),
-                word_to_idx=json.dumps(embedder._word_to_idx),
+                word_to_idx=_json.dumps(embedder._word_to_idx),
                 idf=embedder._idf if embedder._idf is not None else np.zeros(1),
             )
 
@@ -122,7 +123,6 @@ class NumpyVectorStore:
             embedder = ApiEmbedder()
             query_vec = np.array(embedder.embed(query_text)[0], dtype=np.float32)
         else:
-            import json as _json
             word_to_idx: dict[str, int] = _json.loads(str(data["word_to_idx"]))
             idf: np.ndarray = data["idf"]
             embedder = TfidfEmbedder()
