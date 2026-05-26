@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4o-mini"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_enabled: bool = False
     vector_store_dir: str = "data/vectors"
     clone_dir: str = "data/cloned_repos"
     chunk_size: int = 1000
@@ -38,6 +40,9 @@ class Settings(BaseSettings):
     max_concurrent_clones: int = 3
 
     cors_origins: str = "http://localhost:8000,http://localhost:5173"
+
+    auth_enabled: bool = False
+    api_key: str = ""
 
     rate_limit_enabled: bool = True
     rate_light_rpm: int = 300
