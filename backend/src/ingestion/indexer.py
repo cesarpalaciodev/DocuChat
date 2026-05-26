@@ -36,12 +36,12 @@ class NumpyVectorStore:
         texts: list[str] = [str(c["content"]) for c in chunks]
 
         if settings.embedding_enabled:
-            embedder = ApiEmbedder()
+            api_embedder = ApiEmbedder()
             batch_size = 50
             all_vectors: list[list[float]] = []
             for i in range(0, len(texts), batch_size):
                 batch = texts[i : i + batch_size]
-                all_vectors.extend(embedder.embed(batch))
+                all_vectors.extend(api_embedder.embed(batch))
                 logger.debug("Embedded batch %d/%d", i + len(batch), len(texts))
 
             metadatas = [
@@ -65,10 +65,10 @@ class NumpyVectorStore:
             logger.info("API vectors saved: %s (%d chunks)", repo_id, len(chunks))
             return len(chunks)
 
-        embedder = TfidfEmbedder()
-        embedder.fit(texts)
+        tfidf_embedder = TfidfEmbedder()
+        tfidf_embedder.fit(texts)
 
-        all_vectors = [embedder._vectorize(t) for t in texts]
+        all_vectors = [tfidf_embedder._vectorize(t) for t in texts]
 
         metadatas = [
             {**c["metadata"], "repo_id": repo_id, "repo_name": repo_name}
@@ -86,8 +86,8 @@ class NumpyVectorStore:
                 vectors=vectors,
                 texts=np.array(batch_texts, dtype=object),
                 metadatas=np.array(batch_metas, dtype=object),
-                word_to_idx=_json.dumps(embedder._word_to_idx),
-                idf=embedder._idf if embedder._idf is not None else np.zeros(1),
+                word_to_idx=_json.dumps(tfidf_embedder._word_to_idx),
+                idf=tfidf_embedder._idf if tfidf_embedder._idf is not None else np.zeros(1),
             )
 
         logger.info("Vectors saved: %s (%d chunks in %d shards)", repo_id, len(chunks), len(self._shard_glob(repo_id)))
@@ -120,15 +120,15 @@ class NumpyVectorStore:
         is_api_embedding = str(data.get("embedding_type", "")) == "api"
 
         if is_api_embedding:
-            embedder = ApiEmbedder()
-            query_vec = np.array(embedder.embed(query_text)[0], dtype=np.float32)
+            api_emb = ApiEmbedder()
+            query_vec = np.array(api_emb.embed(query_text)[0], dtype=np.float32)
         else:
+            tfidf_emb = TfidfEmbedder()
             word_to_idx: dict[str, int] = _json.loads(str(data["word_to_idx"]))
             idf: np.ndarray = data["idf"]
-            embedder = TfidfEmbedder()
-            embedder._word_to_idx = word_to_idx
-            embedder._idf = idf
-            query_vec = embedder._vectorize(query_text)
+            tfidf_emb._word_to_idx = word_to_idx
+            tfidf_emb._idf = idf
+            query_vec = tfidf_emb._vectorize(query_text)
 
         all_candidates: list[tuple[float, str, dict[str, Any]]] = []
 
