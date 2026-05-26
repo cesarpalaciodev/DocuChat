@@ -24,7 +24,8 @@ class SecretsRedactionFilter(logging.Filter):
         record.msg = _SECRET_PATTERNS.sub("***REDACTED***", str(record.msg))
         if record.args:
             record.args = tuple(
-                _SECRET_PATTERNS.sub("***REDACTED***", str(a)) for a in record.args
+                _SECRET_PATTERNS.sub("***REDACTED***", a) if isinstance(a, str) else a
+                for a in record.args
             )
         return True
 

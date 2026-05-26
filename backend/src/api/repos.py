@@ -2,6 +2,7 @@ import asyncio
 import re
 import shutil
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -10,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from src.core import database as db
 from src.core.config import settings
 from src.ingestion.indexer import vector_store
-from src.ingestion.loader import ingest_repository
+from src.ingestion.loader import ingest_repository, _on_rm_error
 from src.models.schemas import RepoRequest, RepoResponse
 from src.utils.exceptions import IndexingError, RepoNotFoundError
 from src.utils.logging import setup_logger
@@ -46,8 +47,6 @@ def _run_indexing(repo_id: str, repo_url: str, repo_branch: str, repo_name: str)
         db.repo_update(repo_id, "error", error=error_text[:200])
     finally:
         _active_clones -= 1
-        from contextlib import suppress
-        from src.ingestion.loader import _on_rm_error
         clone_dir = settings.clone_path / repo_id
         if clone_dir.exists():
             with suppress(Exception):

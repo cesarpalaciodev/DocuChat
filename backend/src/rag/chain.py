@@ -63,7 +63,7 @@ def _sanitize_context_snippet(text: str) -> str:
 
 def _build_context(docs: list[dict[str, Any]]) -> str:
     parts = []
-    for i, doc in enumerate(docs):
+    for _i, doc in enumerate(docs):
         file_path = doc["metadata"].get("file_path", "unknown")
         safe_content = _sanitize_context_snippet(doc["content"])
         parts.append(f"<document source=\"{file_path}\">\n{safe_content}\n</document>")
