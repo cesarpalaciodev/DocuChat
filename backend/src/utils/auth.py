@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 
@@ -8,13 +10,13 @@ _PUBLIC_PREFIXES = ("/assets/",)
 
 
 class ApiKeyMiddleware:
-    async def __call__(self, request: Request, call_next) -> Response:
+    async def __call__(self, request: Request, call_next: Any) -> Response:  # type: ignore[override]
         if not settings.auth_enabled or not settings.api_key:
-            return await call_next(request)
+            return cast(Response, await call_next(request))
 
         path = request.url.path
         if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
-            return await call_next(request)
+            return cast(Response, await call_next(request))
 
         auth_header = request.headers.get("Authorization", "")
         api_key_header = request.headers.get("X-API-Key", "")
@@ -32,4 +34,4 @@ class ApiKeyMiddleware:
                 content={"detail": "Unauthorized. Provide a valid Bearer token or X-API-Key header."},
             )
 
-        return await call_next(request)
+        return cast(Response, await call_next(request))
