@@ -68,7 +68,7 @@ class NumpyVectorStore:
         tfidf_embedder = TfidfEmbedder()
         tfidf_embedder.fit(texts)
 
-        tfidf_vectors: list = [tfidf_embedder._vectorize(t) for t in texts]
+        tfidf_vectors: list[Any] = [tfidf_embedder._vectorize(t) for t in texts]
         all_vectors_for_save = tfidf_vectors
 
         metadatas = [
