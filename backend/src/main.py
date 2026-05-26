@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api import api_router
 from src.core.config import settings
+from src.utils.auth import ApiKeyMiddleware
 from src.utils.exceptions import DocuChatError
 from src.utils.headers import SecurityHeadersMiddleware
 from src.utils.logging import setup_logger
@@ -64,6 +65,9 @@ if settings.rate_limit_enabled:
         window=settings.rate_window_seconds,
     ))
 
+if settings.auth_enabled:
+    app.middleware("http")(ApiKeyMiddleware())
+
 app.middleware("http")(SecurityHeadersMiddleware())
 
 app.include_router(api_router)
@@ -96,12 +100,29 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 @app.get("/api/health")
 async def health() -> dict[str, object]:
     from src.core import database as db
-    repos = db.repo_list()
+    from src.ingestion.indexer import vector_store
+    import sqlite3
+    try:
+        repos = db.repo_list()
+        db_ok = True
+    except sqlite3.Error:
+        repos = []
+        db_ok = False
+    try:
+        settings.vector_store_path.exists()
+        vs_ok = True
+    except Exception:
+        vs_ok = False
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "degraded",
         "version": "1.0.0",
         "indexed_repos": len(repos),
         "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
+        "checks": {
+            "database": "ok" if db_ok else "error",
+            "vector_store": "ok" if vs_ok else "error",
+            "llm_configured": "ok" if len(settings.llm_api_key) >= 10 else "unconfigured",
+        },
     }
 
 
