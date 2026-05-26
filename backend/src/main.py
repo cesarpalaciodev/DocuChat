@@ -100,7 +100,6 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 @app.get("/api/health")
 async def health() -> dict[str, object]:
     from src.core import database as db
-    from src.ingestion.indexer import vector_store
     import sqlite3
     try:
         repos = db.repo_list()
