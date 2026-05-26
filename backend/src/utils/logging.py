@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import sys
 from logging.handlers import RotatingFileHandler
@@ -38,10 +39,18 @@ def setup_logger(name: str) -> logging.Logger:
 
     logger.setLevel(logging.DEBUG)
 
-    fmt = logging.Formatter(
-        "%(asctime)s | %(levelname)-7s | %(name)-20s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    use_json = os.environ.get("LOG_FORMAT", "").lower() == "json"
+
+    if use_json:
+        fmt = logging.Formatter(
+            '{"time":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","message":"%(message)s"}',
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        )
+    else:
+        fmt = logging.Formatter(
+            "%(asctime)s | %(levelname)-7s | %(name)-20s | %(message)s",
+            datefmt="%H:%M:%S",
+        )
 
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.INFO)
