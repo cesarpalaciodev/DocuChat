@@ -1,3 +1,4 @@
+import sqlite3
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,10 +10,13 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api import api_router
+from src.core import database as db
 from src.core.config import settings
+from src.utils.auth import ApiKeyMiddleware
 from src.utils.exceptions import DocuChatError
+from src.utils.headers import SecurityHeadersMiddleware
 from src.utils.logging import setup_logger
-from src.utils.ratelimit import RateLimiter
+from src.utils.ratelimit import TieredRateLimiter
 
 logger = setup_logger("main")
 
@@ -48,13 +52,25 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://localhost:5173"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
-app.middleware("http")(RateLimiter(requests=60, window=60))
+if settings.rate_limit_enabled:
+    app.middleware("http")(TieredRateLimiter(
+        light_rpm=settings.rate_light_rpm,
+        medium_rpm=settings.rate_medium_rpm,
+        heavy_rpm=settings.rate_heavy_rpm,
+        expense_rpm=settings.rate_expense_rpm,
+        window=settings.rate_window_seconds,
+    ))
+
+if settings.auth_enabled:
+    app.middleware("http")(ApiKeyMiddleware())
+
+app.middleware("http")(SecurityHeadersMiddleware())
 
 app.include_router(api_router)
 
@@ -73,25 +89,39 @@ async def request_validation(request: Request, call_next: Callable[[Request], An
 
 @app.exception_handler(DocuChatError)
 async def docuchat_error_handler(request: Request, exc: DocuChatError) -> JSONResponse:
-    logger.warning("%s: %s", type(exc).__name__, exc)
+    logger.warning("%s: %s (path=%s)", type(exc).__name__, str(exc)[:200], request.url.path)
     return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled error: %s", exc, exc_info=True)
+    logger.error("Unhandled error on %s: %s", request.url.path, exc, exc_info=True)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/api/health")
 async def health() -> dict[str, object]:
-    from src.core import database as db
-    repos = db.repo_list()
+    try:
+        repos = db.repo_list()
+        db_ok = True
+    except sqlite3.Error:
+        repos = []
+        db_ok = False
+    try:
+        settings.vector_store_path.exists()
+        vs_ok = True
+    except Exception:
+        vs_ok = False
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "degraded",
         "version": "1.0.0",
         "indexed_repos": len(repos),
         "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
+        "checks": {
+            "database": "ok" if db_ok else "error",
+            "vector_store": "ok" if vs_ok else "error",
+            "llm_configured": "ok" if len(settings.llm_api_key) >= 10 else "unconfigured",
+        },
     }
 
 

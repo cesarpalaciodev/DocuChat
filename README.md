@@ -7,27 +7,33 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![CI](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml)
 
-Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Uses **TF-IDF** + **numpy** + **SQLite** with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
+Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Supports both **TF-IDF** (local, no GPU) and **API embeddings** (semantic, via OpenAI-compatible API) with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
 
 ## Features
 
 - Clone and index code repositories (Markdown, source files, READMEs)
-- TF-IDF semantic search with cosine similarity (no GPU needed)
+- **Dual search**: TF-IDF (offline) or semantic API embeddings (`EMBEDDING_ENABLED=true`)
 - RAG-powered answers with source citations
-- **SSE streaming** — answers appear token by token
+- **SSE streaming** — answers appear token by token, with **Stop** button
 - **Multi-repository** support with cross-repo search
 - **Conversation history** persisted in SQLite
 - **Markdown export** for conversations
-- **Dark/light mode** toggle
-- **Keyboard shortcuts** (Ctrl+K focus input, Esc toggle)
-- **Rate limiting**, input validation, anti-path-traversal security
+- **Regenerate** last response
+- **Copy code** button on all code blocks
+- **Dark/light mode** with animated toggle
+- **Keyboard shortcuts** (⌘K focus input, Esc toggle)
+- **Sidebar resizable** (240px - 500px)
+- **Mobile responsive** with slide-over drawer
+- **Rate limiting** by IP and API key, input validation, anti-path-traversal
+- **API key auth** (configurable via `AUTH_ENABLED=true`)
+- **Circuit breaker** for LLM and embedding APIs
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | LLM | Any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq) |
-| Embeddings | TF-IDF (numpy, pure Python, no GPU) |
+| Embeddings | TF-IDF (numpy) or API embeddings (text-embedding-3-small) |
 | Vector Store | Numpy `.npz` sharded by 2000 vectors |
 | Database | SQLite (WAL mode) for repos + conversations |
 | Backend | FastAPI + Uvicorn |
@@ -93,17 +99,21 @@ docker-compose up
 
 ## Security
 
-| Feature | Detail |
-|---------|--------|
-| URL allowlist | Only github.com, gitlab.com, bitbucket.org by default |
-| Path traversal | Blocked in URLs and branch names |
-| File size limit | Skip files > 500KB (configurable) |
-| Chunk limit | Max 20000 total chunks per repo |
-| Clone timeout | 60 seconds (configurable) |
-| Concurrent clones | Max 3 simultaneous |
-| Rate limiting | 60 requests/minute per IP |
-| Input validation | Pydantic with sanitization |
-| Body size limit | 10MB max POST body |
+| Category | Measure |
+|----------|---------|
+| **Prompt Injection** | Blocks 20+ injection patterns (`"ignore all instructions"`, `"<|im_start|>"`, role redefinition). Context wrapped in XML tags to isolate from system prompt. |
+| **Input Validation** | All IDs validated with regex (`[a-f0-9]{8,64}`). URL allowlist. Path traversal blocked (12 patterns). Body size limit 10MB. |
+| **Rate Limiting** | 4 tiers per endpoint: light (health 300rpm), medium (list 60rpm), heavy (chat/search 20rpm), expense (clone 5rpm). `Retry-After` and `X-RateLimit-*` headers. Stale bucket cleanup. |
+| **Error Handling** | Sanitized errors — no stack traces, no raw LLM errors, no internal paths leaked to client. Full tracebacks logged server-side only. |
+| **Security Headers** | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`. |
+| **Git Clone** | Disabled hooks (`GIT_TERMINAL_PROMPT=0`, `GIT_ASKPASS=echo`). Symlink detection. Binary file detection. Cleanup in `finally` block. |
+| **Logging** | Rotating 10MB/5 backup files. Secrets redaction filter (`sk-*`, `Bearer`, `api_key`). No secrets exposed in logs. |
+| **LLM API** | Exponential backoff retry (1s/2s/4s) on 429/502/503/504. Connection pooling with `httpx.Client`. Circuit breaker (opens after 3 failures/30s). Configurable timeouts. |
+| **Markdown** | Frontend validates link protocols (`http:`, `https:`, `mailto:` only). `javascript:` and dangerous URLs blocked. |
+| **Database** | Parameterized queries (SQL injection immune). WAL mode. Connection timeout. Foreign keys enforced. |
+| **Docker** | Non-root `appuser`. `--proxy-headers` enabled. Multi-worker via gunicorn (configurable `WORKERS` env). |
+| **CORS** | Configurable via `CORS_ORIGINS` env var. Methods restricted to GET/POST/DELETE. Headers restricted. |
+| **API Key Auth** | Optional middleware. Supports `Authorization: Bearer <key>` or `X-API-Key: <key>`. Public paths (health, assets) excluded. |
 
 ## Configuration (.env)
 
@@ -118,6 +128,22 @@ MAX_TOTAL_CHUNKS=20000
 MAX_FILE_SIZE=500000
 CLONE_TIMEOUT_SECONDS=60
 MAX_CONCURRENT_CLONES=3
+
+# CORS
+CORS_ORIGINS=http://localhost:8000,http://localhost:5173
+
+# Rate limiting (per endpoint tier)
+RATE_LIMIT_ENABLED=true
+RATE_LIGHT_RPM=300
+RATE_MEDIUM_RPM=60
+RATE_HEAVY_RPM=20
+RATE_EXPENSE_RPM=5
+RATE_WINDOW_SECONDS=60
+
+# LLM
+LLM_TIMEOUT_SECONDS=60
+LLM_STREAM_TIMEOUT_SECONDS=90
+LLM_MAX_RETRIES=2
 ```
 
 ## Project Structure
@@ -155,3 +181,20 @@ docu-chat/
 cd backend
 python -m pytest tests/ -v
 ```
+
+## Roadmap — Lo que más subiría el proyecto
+
+### 1. Demo pública ⭐⭐⭐⭐⭐
+Una demo en vivo (Vercel/Railway) con 1-2 repos pre-indexados para que cualquiera pruebe sin instalar nada. Impacto inmediato en adopción.
+
+### 2. Streaming tipo ChatGPT ⭐⭐⭐⭐⭐
+Ya implementado (SSE vía `/api/chat/stream`). Mejora pendiente: abortar generación a mitad de stream, reanudar conversaciones interrumpidas.
+
+### 3. Multi-user + Auth ⭐⭐⭐⭐
+JWT o Clerk/Auth.js. Cada usuario con sus propios repos, conversaciones, y rate limits. Esto lo acerca a SaaS.
+
+### 4. Vector DB seria ⭐⭐⭐⭐
+Migrar de TF-IDF + numpy a Qdrant, Pinecone, Weaviate o pgvector. Ventajas: búsqueda semántica real, filtros avanzados, escalabilidad, multi-tenant nativo.
+
+### 5. Observabilidad ⭐⭐⭐
+Métricas (Prometheus), tracing (OpenTelemetry), logs estructurados, dashboard de uso. Esencial para producción con múltiples usuarios.

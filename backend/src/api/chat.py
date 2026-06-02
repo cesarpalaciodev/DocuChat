@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -14,6 +15,12 @@ from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+_ID_RE = re.compile(r"^[a-f0-9]{8,64}$")
+
+
+def _validate_conv_id(conv_id: str) -> None:
+    if not _ID_RE.match(conv_id):
+        raise HTTPException(status_code=400, detail="Invalid conversation ID format")
 
 
 def _validate_repo(repo_id: str | None) -> None:
@@ -36,9 +43,11 @@ async def chat(body: ChatRequest) -> ChatResponse:
 
     try:
         result = query(body.question, body.repo_id)
+    except LLMError:
+        raise
     except Exception as e:
-        logger.error("LLM query failed: %s", e)
-        raise LLMError(str(e)) from e
+        logger.error("LLM query failed: %s", e, exc_info=True)
+        raise LLMError("LLM query failed") from e
 
     sources = [SourceDocument(**s) for s in result["sources"]]
     db.message_add(conv_id, "assistant", result["answer"], [s.model_dump() for s in sources])
@@ -83,19 +92,22 @@ async def chat_stream(body: ChatRequest) -> StreamingResponse:
                 yield f"data: {json.dumps({'token': token, 'conv_id': conv_id})}\n\n"
 
         except Exception as e:
-            logger.error("Stream failed: %s", e)
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            logger.error("Stream failed: %s", e, exc_info=True)
+            yield f"data: {json.dumps({'error': 'An unexpected error occurred'})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @router.get("/conversations")
 async def list_conversations(repo_id: str | None = None) -> list[dict[str, Any]]:
+    if repo_id and not _ID_RE.match(repo_id):
+        return []
     return db.conversation_list(repo_id)
 
 
 @router.get("/conversations/{conv_id}")
 async def get_conversation(conv_id: str) -> dict[str, Any]:
+    _validate_conv_id(conv_id)
     messages = db.messages_list(conv_id)
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -104,6 +116,7 @@ async def get_conversation(conv_id: str) -> dict[str, Any]:
 
 @router.delete("/conversations/{conv_id}")
 async def delete_conversation(conv_id: str) -> dict[str, str]:
+    _validate_conv_id(conv_id)
     deleted = db.conversation_delete(conv_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -113,6 +126,7 @@ async def delete_conversation(conv_id: str) -> dict[str, str]:
 
 @router.get("/conversations/{conv_id}/export")
 async def export_conversation(conv_id: str) -> dict[str, str]:
+    _validate_conv_id(conv_id)
     messages = db.messages_list(conv_id)
     if not messages:
         raise HTTPException(status_code=404, detail="Conversation not found")

@@ -11,7 +11,7 @@ class RepoCloneError(DocuChatError):
 
 class RepoNotFoundError(DocuChatError):
     def __init__(self, repo_id: str) -> None:
-        super().__init__(f"Repository not found: {repo_id}", 404)
+        super().__init__("Repository not found", 404)
 
 
 class IndexingError(DocuChatError):

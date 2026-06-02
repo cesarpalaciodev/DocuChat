@@ -72,6 +72,39 @@ export async function deleteRepo(repoId: string): Promise<void> {
   }
 }
 
+export interface Conversation {
+  id: string
+  repo_id: string | null
+  created_at: string
+}
+
+export interface ConversationMessage {
+  id: number
+  conversation_id: string
+  role: "user" | "assistant"
+  content: string
+  sources: string | null
+  created_at: string
+}
+
+export async function listConversations(repoId: string | null = null): Promise<Conversation[]> {
+  const params = repoId ? `?repo_id=${repoId}` : ""
+  const res = await fetch(`${BASE}/chat/conversations${params}`)
+  if (!res.ok) throw new Error("Failed to fetch conversations")
+  return res.json()
+}
+
+export async function getConversation(id: string): Promise<{ id: string; messages: ConversationMessage[] }> {
+  const res = await fetch(`${BASE}/chat/conversations/${id}`)
+  if (!res.ok) throw new Error("Conversation not found")
+  return res.json()
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/chat/conversations/${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Failed to delete conversation")
+}
+
 export interface StreamCallbacks {
   onToken: (token: string) => void
   onDone: (result: { conv_id: string; repo_name?: string; sources?: SourceDoc[] }) => void

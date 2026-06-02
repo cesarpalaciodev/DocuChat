@@ -35,6 +35,6 @@ def test_chat_request_empty_question():
 
 
 def test_chat_request_with_repo():
-    req = ChatRequest(question="test", repo_id="abc123", conversation_id="conv1")
-    assert req.repo_id == "abc123"
-    assert req.conversation_id == "conv1"
+    req = ChatRequest(question="test", repo_id="abcdef1234567890", conversation_id="1234567890abcdef")
+    assert req.repo_id == "abcdef1234567890"
+    assert req.conversation_id == "1234567890abcdef"
