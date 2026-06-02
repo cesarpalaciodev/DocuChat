@@ -17,6 +17,7 @@ Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documen
 - **SSE streaming** — answers appear token by token
 - **Multi-repository** support with cross-repo search
 - **Conversation history** persisted in SQLite
+- **Markdown export** for conversations
 - **Dark/light mode** toggle
 - **Keyboard shortcuts** (Ctrl+K focus input, Esc toggle)
 - **Rate limiting**, input validation, anti-path-traversal security
@@ -85,6 +86,9 @@ docker-compose up
 | POST | `/api/chat/stream` | Ask with SSE streaming |
 | GET | `/api/chat/conversations` | List conversations |
 | GET | `/api/chat/conversations/{id}` | Get conversation messages |
+| DELETE | `/api/chat/conversations/{id}` | Delete a conversation |
+| GET | `/api/search` | Search across repositories |
+| GET | `/api/stats` | Get system and repository statistics |
 | GET | `/api/health` | Health check |
 
 ## Security

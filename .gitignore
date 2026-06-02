@@ -14,3 +14,6 @@ logs/
 .vite/
 *.bak
 /tmp/
+.venv/  
+.commandcode/  
+.opencode/ 
