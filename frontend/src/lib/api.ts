@@ -135,6 +135,7 @@ export async function sendMessageStream(
 
   const decoder = new TextDecoder()
   let buffer = ""
+  let isDone = false
 
   while (true) {
     const { done, value } = await reader.read()
@@ -158,6 +159,7 @@ export async function sendMessageStream(
               repo_name: data.repo_name,
               sources: data.sources,
             })
+            isDone = true
             return
           }
           if (data.token) {
@@ -168,5 +170,9 @@ export async function sendMessageStream(
         }
       }
     }
+  }
+
+  if (!isDone) {
+    callbacks.onError("Stream ended unexpectedly")
   }
 }

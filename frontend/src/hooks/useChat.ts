@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react"
 import { sendMessageStream, SourceDoc } from "../lib/api"
+import { notify } from "../components/Toast"
 
 export interface Message {
   role: "user" | "assistant"
@@ -14,13 +15,14 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null)
   const convIdRef = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const lastQuestionRef = useRef<string>("")
 
   const ask = useCallback(async (question: string, repoId: string | null) => {
-    if (abortRef.current) {
-      abortRef.current.abort()
-    }
+    if (abortRef.current) { abortRef.current.abort() }
     const controller = new AbortController()
     abortRef.current = controller
+
+    lastQuestionRef.current = question
 
     setMessages((prev) => [...prev, { role: "user", content: question }])
     setLoading(true)
@@ -65,6 +67,7 @@ export function useChat() {
             return updated
           })
           setError(errMsg)
+          notify(errMsg, "error")
           setLoading(false)
           abortRef.current = null
         },
@@ -75,6 +78,7 @@ export function useChat() {
       }
       const msg = e instanceof Error ? e.message : "Unknown error"
       setError(msg)
+      notify(msg, "error")
       setMessages((prev) => {
         const updated = [...prev]
         updated[msgIndex] = { role: "assistant", content: `[err] ${msg}` }
@@ -95,12 +99,27 @@ export function useChat() {
     convIdRef.current = null
   }, [])
 
-  const loadMessages = useCallback((msgs: Message[]) => {
+  const loadMessages = useCallback((msgs: Message[], convId: string | null) => {
     if (abortRef.current) abortRef.current.abort()
     setMessages(msgs)
     setError(null)
-    convIdRef.current = null
+    convIdRef.current = convId
   }, [])
 
-  return { messages, loading, error, ask, clear, loadMessages }
+  const stop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setLoading(false)
+  }, [])
+
+  const regenerate = useCallback((repoId: string | null) => {
+    if (!lastQuestionRef.current) return
+    convIdRef.current = null
+    setMessages((prev) => prev.slice(0, -1))
+    ask(lastQuestionRef.current, repoId)
+  }, [ask])
+
+  return { messages, loading, error, ask, clear, loadMessages, stop, regenerate }
 }

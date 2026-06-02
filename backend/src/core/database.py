@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -9,11 +10,12 @@ from src.utils.logging import setup_logger
 logger = setup_logger(__name__)
 
 DB_PATH = Path("data/docuchat.db")
+_db_lock = threading.Lock()
 
 
 def get_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH), timeout=10.0)
+    conn = sqlite3.connect(str(DB_PATH), timeout=10.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -58,98 +60,128 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     logger.debug("Database tables initialized")
 
 
+def _safe_write(func):
+    def wrapper(*args, **kwargs):
+        with _db_lock:
+            return func(*args, **kwargs)
+    return wrapper
+
+
+@_safe_write
 def repo_create(repo_id: str, url: str, name: str, branch: str) -> None:
     conn = get_db()
-    conn.execute(
-        "INSERT INTO repos (id, url, name, branch, status, created_at) VALUES (?, ?, ?, ?, 'indexing', ?)",
-        (repo_id, url, name, branch, datetime.now(UTC).isoformat()),
-    )
-    conn.commit()
-    conn.close()
-    logger.info("Repo created: %s (%s)", name, repo_id)
+    try:
+        conn.execute(
+            "INSERT INTO repos (id, url, name, branch, status, created_at) VALUES (?, ?, ?, ?, 'indexing', ?)",
+            (repo_id, url, name, branch, datetime.now(UTC).isoformat()),
+        )
+        conn.commit()
+        logger.info("Repo created: %s (%s)", name, repo_id)
+    finally:
+        conn.close()
 
 
+@_safe_write
 def repo_update(repo_id: str, status: str, indexed_documents: int = 0, error: str | None = None) -> None:
     conn = get_db()
-    conn.execute(
-        "UPDATE repos SET status = ?, indexed_documents = ?, error = ? WHERE id = ?",
-        (status, indexed_documents, error, repo_id),
-    )
-    conn.commit()
-    conn.close()
-    logger.info("Repo updated: %s -> %s (%d chunks)", repo_id, status, indexed_documents)
+    try:
+        conn.execute(
+            "UPDATE repos SET status = ?, indexed_documents = ?, error = ? WHERE id = ?",
+            (status, indexed_documents, error, repo_id),
+        )
+        conn.commit()
+        logger.info("Repo updated: %s -> %s (%d chunks)", repo_id, status, indexed_documents)
+    finally:
+        conn.close()
 
 
 def repo_list() -> list[dict[str, Any]]:
     conn = get_db()
-    rows = conn.execute("SELECT * FROM repos ORDER BY created_at DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute("SELECT * FROM repos ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def repo_get(repo_id: str) -> dict[str, Any] | None:
     conn = get_db()
-    row = conn.execute("SELECT * FROM repos WHERE id = ?", (repo_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    try:
+        row = conn.execute("SELECT * FROM repos WHERE id = ?", (repo_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
+@_safe_write
 def repo_delete(repo_id: str) -> bool:
     conn = get_db()
-    cursor = conn.execute("DELETE FROM repos WHERE id = ?", (repo_id,))
-    conn.commit()
-    deleted = cursor.rowcount > 0
-    conn.close()
-    return deleted
+    try:
+        cursor = conn.execute("DELETE FROM repos WHERE id = ?", (repo_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
 
 
+@_safe_write
 def conversation_create(conversation_id: str, repo_id: str | None) -> None:
     conn = get_db()
-    conn.execute(
-        "INSERT INTO conversations (id, repo_id, created_at) VALUES (?, ?, ?)",
-        (conversation_id, repo_id, datetime.now(UTC).isoformat()),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute(
+            "INSERT INTO conversations (id, repo_id, created_at) VALUES (?, ?, ?)",
+            (conversation_id, repo_id, datetime.now(UTC).isoformat()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def conversation_list(repo_id: str | None = None) -> list[dict[str, Any]]:
     conn = get_db()
-    if repo_id:
-        rows = conn.execute(
-            "SELECT * FROM conversations WHERE repo_id = ? ORDER BY created_at DESC", (repo_id,)
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM conversations ORDER BY created_at DESC").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        if repo_id:
+            rows = conn.execute(
+                "SELECT * FROM conversations WHERE repo_id = ? ORDER BY created_at DESC", (repo_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM conversations ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
+@_safe_write
 def message_add(conversation_id: str, role: str, content: str, sources: list[dict[str, Any]] | None = None) -> int:
     conn = get_db()
-    cursor = conn.execute(
-        "INSERT INTO messages (conversation_id, role, content, sources, created_at) VALUES (?, ?, ?, ?, ?)",
-        (conversation_id, role, content, json.dumps(sources or []), datetime.now(UTC).isoformat()),
-    )
-    conn.commit()
-    msg_id = cursor.lastrowid
-    conn.close()
-    return msg_id or 0
+    try:
+        cursor = conn.execute(
+            "INSERT INTO messages (conversation_id, role, content, sources, created_at) VALUES (?, ?, ?, ?, ?)",
+            (conversation_id, role, content, json.dumps(sources or []), datetime.now(UTC).isoformat()),
+        )
+        conn.commit()
+        return cursor.lastrowid or 0
+    finally:
+        conn.close()
 
 
 def messages_list(conversation_id: str) -> list[dict[str, Any]]:
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC", (conversation_id,)
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute(
+            "SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC", (conversation_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
+@_safe_write
 def conversation_delete(conv_id: str) -> bool:
     conn = get_db()
-    cursor = conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
-    conn.commit()
-    deleted = cursor.rowcount > 0
-    conn.close()
-    return deleted
+    try:
+        cursor = conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
