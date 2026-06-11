@@ -4,7 +4,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from src.core import database as db
@@ -32,17 +32,27 @@ def _validate_repo(repo_id: str | None) -> None:
             raise DocuChatError(f"Repository {repo_id} is not ready (status: {repo['status']})", 400)
 
 
+def _get_user_params(request: Request) -> tuple[str | None, str | None, str | None]:
+    key = request.headers.get("X-User-API-Key", "").strip() or None
+    model = request.headers.get("X-User-Model", "").strip() or None
+    url = request.headers.get("X-User-Base-URL", "").strip() or None
+    return key, model, url
+
+
 @router.post("/", response_model=ChatResponse)
-async def chat(body: ChatRequest) -> ChatResponse:
+async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     conv_id = body.conversation_id or uuid.uuid4().hex[:16]
     _validate_repo(body.repo_id)
 
     if not body.conversation_id:
-        db.conversation_create(conv_id, body.repo_id)
+        user_id = getattr(request.state, "user_id", None)
+        db.conversation_create(conv_id, body.repo_id, user_id)
     db.message_add(conv_id, "user", body.question)
 
+    api_key, model, base_url = _get_user_params(request)
+
     try:
-        result = query(body.question, body.repo_id)
+        result = query(body.question, body.repo_id, api_key=api_key, model=model, base_url=base_url)
     except LLMError:
         raise
     except Exception as e:
@@ -61,18 +71,21 @@ async def chat(body: ChatRequest) -> ChatResponse:
 
 
 @router.post("/stream")
-async def chat_stream(body: ChatRequest) -> StreamingResponse:
+async def chat_stream(body: ChatRequest, request: Request) -> StreamingResponse:
     conv_id = body.conversation_id or uuid.uuid4().hex[:16]
     _validate_repo(body.repo_id)
 
     if not body.conversation_id:
-        db.conversation_create(conv_id, body.repo_id)
+        user_id = getattr(request.state, "user_id", None)
+        db.conversation_create(conv_id, body.repo_id, user_id)
     db.message_add(conv_id, "user", body.question)
+
+    api_key, model, base_url = _get_user_params(request)
 
     async def generate() -> AsyncGenerator[str, None]:
         full_answer = ""
         try:
-            gen = query_stream(body.question, body.repo_id)
+            gen = query_stream(body.question, body.repo_id, api_key=api_key, model=model, base_url=base_url)
             for token in gen:
                 if token.startswith('{"__done__":'):
                     try:
@@ -100,18 +113,20 @@ async def chat_stream(body: ChatRequest) -> StreamingResponse:
 
 @router.get("/conversations")
 async def list_conversations(
+    request: Request,
     repo_id: str | None = None,
     offset: int = 0,
     limit: int = 50,
 ) -> dict[str, Any]:
+    user_id = getattr(request.state, "user_id", None)
     if repo_id and not _ID_RE.match(repo_id):
         return {"items": [], "total": 0, "offset": offset, "limit": limit}
     if offset < 0:
         offset = 0
     if limit < 1 or limit > 200:
         limit = 50
-    items = db.conversation_list(repo_id, offset, limit)
-    total = db.conversation_count(repo_id)
+    items = db.conversation_list(repo_id, offset, limit, user_id)
+    total = db.conversation_count(repo_id, user_id)
     return {"items": items, "total": total, "offset": offset, "limit": limit}
 
 

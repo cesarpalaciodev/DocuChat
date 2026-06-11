@@ -1,5 +1,7 @@
+import hashlib
 import json
 import sqlite3
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -51,18 +53,32 @@ def _init_tables(conn: sqlite3.Connection) -> None:
             FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_repos_status ON repos(status);
         CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
     """)
+
+    for col, table in [("user_id", "repos"), ("user_id", "conversations")]:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
+
     conn.commit()
     logger.debug("Database tables initialized")
 
 
-def repo_create(repo_id: str, url: str, name: str, branch: str) -> None:
+def repo_create(repo_id: str, url: str, name: str, branch: str, user_id: str | None = None) -> None:
     conn = get_db()
     conn.execute(
-        "INSERT INTO repos (id, url, name, branch, status, created_at) VALUES (?, ?, ?, ?, 'indexing', ?)",
-        (repo_id, url, name, branch, datetime.now(UTC).isoformat()),
+        "INSERT INTO repos (id, url, name, branch, user_id, status, created_at) VALUES (?, ?, ?, ?, ?, 'indexing', ?)",
+        (repo_id, url, name, branch, user_id, datetime.now(UTC).isoformat()),
     )
     conn.commit()
     conn.close()
@@ -80,9 +96,12 @@ def repo_update(repo_id: str, status: str, indexed_documents: int = 0, error: st
     logger.info("Repo updated: %s -> %s (%d chunks)", repo_id, status, indexed_documents)
 
 
-def repo_list() -> list[dict[str, Any]]:
+def repo_list(user_id: str | None = None) -> list[dict[str, Any]]:
     conn = get_db()
-    rows = conn.execute("SELECT * FROM repos ORDER BY created_at DESC").fetchall()
+    if user_id:
+        rows = conn.execute("SELECT * FROM repos WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM repos ORDER BY created_at DESC").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -103,38 +122,79 @@ def repo_delete(repo_id: str) -> bool:
     return deleted
 
 
-def conversation_create(conversation_id: str, repo_id: str | None) -> None:
+def user_create(username: str, password_hash: str) -> str:
+    user_id = uuid.uuid4().hex[:16]
     conn = get_db()
     conn.execute(
-        "INSERT INTO conversations (id, repo_id, created_at) VALUES (?, ?, ?)",
-        (conversation_id, repo_id, datetime.now(UTC).isoformat()),
+        "INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+        (user_id, username, password_hash, datetime.now(UTC).isoformat()),
+    )
+    conn.commit()
+    conn.close()
+    logger.info("User created: %s (%s)", username, user_id)
+    return user_id
+
+
+def user_get(username: str) -> dict[str, Any] | None:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def user_get_by_id(user_id: str) -> dict[str, Any] | None:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def conversation_create(conversation_id: str, repo_id: str | None, user_id: str | None = None) -> None:
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO conversations (id, repo_id, user_id, created_at) VALUES (?, ?, ?, ?)",
+        (conversation_id, repo_id, user_id, datetime.now(UTC).isoformat()),
     )
     conn.commit()
     conn.close()
 
 
-def conversation_list(repo_id: str | None = None, offset: int = 0, limit: int = 50) -> list[dict[str, Any]]:
+def conversation_list(
+    repo_id: str | None = None,
+    offset: int = 0,
+    limit: int = 50,
+    user_id: str | None = None,
+) -> list[dict[str, Any]]:
     conn = get_db()
+    conditions: list[str] = []
+    params: list[Any] = []
     if repo_id:
-        rows = conn.execute(
-            "SELECT * FROM conversations WHERE repo_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (repo_id, limit, offset),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM conversations ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (limit, offset),
-        ).fetchall()
+        conditions.append("repo_id = ?")
+        params.append(repo_id)
+    if user_id:
+        conditions.append("user_id = ?")
+        params.append(user_id)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = conn.execute(
+        f"SELECT * FROM conversations {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        [*params, limit, offset],
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def conversation_count(repo_id: str | None = None) -> int:
+def conversation_count(repo_id: str | None = None, user_id: str | None = None) -> int:
     conn = get_db()
+    conditions: list[str] = []
+    params: list[Any] = []
     if repo_id:
-        row = conn.execute("SELECT COUNT(*) FROM conversations WHERE repo_id = ?", (repo_id,)).fetchone()
-    else:
-        row = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()
+        conditions.append("repo_id = ?")
+        params.append(repo_id)
+    if user_id:
+        conditions.append("user_id = ?")
+        params.append(user_id)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    row = conn.execute(f"SELECT COUNT(*) FROM conversations {where}", params).fetchone()
     conn.close()
     return int(row[0]) if row else 0
 

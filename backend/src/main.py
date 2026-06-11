@@ -13,9 +13,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api import api_router
+from src.api.auth import router as auth_router
 from src.core import database as db
 from src.core.config import settings
-from src.utils.auth import ApiKeyMiddleware
+from src.utils.auth import AuthMiddleware
 from src.utils.exceptions import DocuChatError
 from src.utils.headers import SecurityHeadersMiddleware
 from src.utils.logging import setup_logger
@@ -49,8 +50,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         with suppress(Exception):
             shutil.rmtree(item, ignore_errors=True)
     if not settings.llm_api_key or len(settings.llm_api_key) < 10:
-        logger.error("LLM_API_KEY not configured or too short")
-        raise SystemExit("LLM_API_KEY must be a valid API key in .env")
+        logger.warning("LLM_API_KEY not configured - users must provide their own API keys")
+    else:
+        logger.info("Server LLM API key configured")
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
@@ -86,7 +88,7 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-User-API-Key", "X-User-Model", "X-User-Base-URL", "X-Auth-Token"],
 )
 
 if settings.rate_limit_enabled:
@@ -98,12 +100,12 @@ if settings.rate_limit_enabled:
         window=settings.rate_window_seconds,
     ))
 
-if settings.auth_enabled:
-    app.middleware("http")(ApiKeyMiddleware())
+app.middleware("http")(AuthMiddleware())
 
 app.middleware("http")(SecurityHeadersMiddleware())
 
 app.include_router(api_router)
+app.include_router(auth_router)
 
 
 @app.middleware("http")
@@ -196,6 +198,18 @@ async def stats() -> dict[str, object]:
         "total_chunks": total_chunks,
         "total_conversations": total_convos,
     }
+
+
+@app.post("/api/validate-key")
+async def validate_key(request: Request) -> dict[str, object]:
+    body = await request.json()
+    api_key = (body.get("api_key") or "").strip()
+    base_url = (body.get("base_url") or "").strip() or None
+    if not api_key:
+        return {"valid": False, "error": "API key is required"}
+    from src.rag.chain import validate_api_key
+    valid, detail = validate_api_key(api_key, base_url)
+    return {"valid": valid, "error": None if valid else detail}
 
 
 if STATIC_DIR.exists() and list(STATIC_DIR.glob("index.html")):

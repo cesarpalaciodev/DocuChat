@@ -48,6 +48,9 @@ _INJECTION_SEPARATORS = re.compile(
     re.IGNORECASE,
 )
 
+_CLIENT_CACHE: dict[str, httpx.Client] = {}
+_RETRYABLE_STATUSES = {429, 502, 503, 504}
+
 
 def _sanitize_user_input(text: str) -> str:
     text = _INJECTION_SEPARATORS.sub("", text)
@@ -63,7 +66,7 @@ def _sanitize_context_snippet(text: str) -> str:
 
 def _build_context(docs: list[dict[str, Any]]) -> str:
     parts = []
-    for _i, doc in enumerate(docs):
+    for doc in docs:
         file_path = doc["metadata"].get("file_path", "unknown")
         safe_content = _sanitize_context_snippet(doc["content"])
         parts.append(f"<document source=\"{file_path}\">\n{safe_content}\n</document>")
@@ -72,7 +75,7 @@ def _build_context(docs: list[dict[str, Any]]) -> str:
 
 def _collect_sources(retrieved: list[dict[str, Any]]) -> list[dict[str, str]]:
     sources = []
-    seen = set()
+    seen: set[str] = set()
     for doc in retrieved:
         fp = doc["metadata"].get("file_path", "unknown")
         if fp not in seen:
@@ -84,35 +87,48 @@ def _collect_sources(retrieved: list[dict[str, Any]]) -> list[dict[str, str]]:
     return sources
 
 
-_LLM_CLIENT: httpx.Client | None = None
-
-
-def _get_llm_client() -> httpx.Client:
-    global _LLM_CLIENT
-    if _LLM_CLIENT is None or _LLM_CLIENT.is_closed:
-        _LLM_CLIENT = httpx.Client(
+def _get_client(api_key: str) -> httpx.Client:
+    if api_key not in _CLIENT_CACHE:
+        _CLIENT_CACHE[api_key] = httpx.Client(
             timeout=httpx.Timeout(settings.llm_timeout_seconds, connect=10.0),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            limits=httpx.Limits(max_keepalive_connections=2, max_connections=5),
         )
-    return _LLM_CLIENT
+    return _CLIENT_CACHE[api_key]
 
 
-_RETRYABLE_STATUSES = {429, 502, 503, 504}
+def _resolve_params(
+    api_key: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+) -> tuple[str, str, str]:
+    key = (api_key or "").strip()
+    mdl = (model or "").strip()
+    url = (base_url or "").strip()
+    if not key:
+        if settings.llm_api_key and len(settings.llm_api_key) >= 10:
+            key = settings.llm_api_key
+        else:
+            raise LLMError("API key required. Open Settings with Ctrl+\\ to configure your key.")
+    if not url:
+        url = settings.llm_base_url
+    if not mdl:
+        mdl = settings.llm_model
+    return key, mdl, url.rstrip("/")
 
 
 def _llm_request_with_retry(
-    url: str, payload: dict[str, Any], stream: bool = False
+    api_key: str, url: str, payload: dict[str, Any], stream: bool = False
 ) -> httpx.Response:
     last_error: Exception | None = None
 
     for attempt in range(settings.llm_max_retries + 1):
         try:
-            client = _get_llm_client()
+            client = _get_client(api_key)
             timeout = settings.llm_stream_timeout_seconds if stream else settings.llm_timeout_seconds
             resp = client.post(
                 url,
                 headers={
-                    "Authorization": f"Bearer {settings.llm_api_key}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
                 json=payload,
@@ -150,17 +166,24 @@ def _get_system_prompt() -> str:
     return SYSTEM_PROMPT
 
 
-def query(question: str, repo_id: str | None = None) -> dict[str, Any]:
+def query(
+    question: str,
+    repo_id: str | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+) -> dict[str, Any]:
     _sanitize_user_input(question)
+    key, mdl, url = _resolve_params(api_key, model, base_url)
 
     retrieved = vector_store.search(question, repo_id, settings.retrieval_k)
     logger.info("Query: %s (repo=%s, results=%d)", question[:80], repo_id, len(retrieved))
 
     context = _build_context(retrieved)
-    url = f"{settings.llm_base_url.rstrip('/')}/chat/completions"
+    llm_url = f"{url}/chat/completions"
 
-    payload = {
-        "model": settings.llm_model,
+    payload: dict[str, Any] = {
+        "model": mdl,
         "messages": [
             {"role": "system", "content": _get_system_prompt()},
             {"role": "user", "content": f"Contexto de documentacion:\n{context}\n\nPregunta del usuario: {question}"},
@@ -169,8 +192,8 @@ def query(question: str, repo_id: str | None = None) -> dict[str, Any]:
         "max_tokens": 2048,
     }
 
-    logger.debug("Calling LLM: %s", url)
-    resp = _llm_request_with_retry(url, payload)
+    logger.debug("Calling LLM: %s (model=%s)", llm_url, mdl)
+    resp = _llm_request_with_retry(key, llm_url, payload)
 
     if resp.status_code != 200:
         err_detail = resp.text[:300]
@@ -187,17 +210,24 @@ def query(question: str, repo_id: str | None = None) -> dict[str, Any]:
     return {"answer": answer, "sources": sources, "repo_name": repo_name}
 
 
-def query_stream(question: str, repo_id: str | None = None) -> Generator[str, None, None]:
+def query_stream(
+    question: str,
+    repo_id: str | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+) -> Generator[str, None, None]:
     _sanitize_user_input(question)
+    key, mdl, url = _resolve_params(api_key, model, base_url)
 
     retrieved = vector_store.search(question, repo_id, settings.retrieval_k)
     logger.info("Stream query: %s (repo=%s, results=%d)", question[:80], repo_id, len(retrieved))
 
     context = _build_context(retrieved)
-    url = f"{settings.llm_base_url.rstrip('/')}/chat/completions"
+    llm_url = f"{url}/chat/completions"
 
-    payload = {
-        "model": settings.llm_model,
+    payload: dict[str, Any] = {
+        "model": mdl,
         "messages": [
             {"role": "system", "content": _get_system_prompt()},
             {"role": "user", "content": f"Contexto de documentacion:\n{context}\n\nPregunta del usuario: {question}"},
@@ -208,7 +238,7 @@ def query_stream(question: str, repo_id: str | None = None) -> Generator[str, No
     }
 
     try:
-        resp = _llm_request_with_retry(url, payload, stream=True)
+        resp = _llm_request_with_retry(key, llm_url, payload, stream=True)
 
         if resp.status_code != 200:
             try:
@@ -242,3 +272,25 @@ def query_stream(question: str, repo_id: str | None = None) -> Generator[str, No
     repo_name = retrieved[0]["metadata"].get("repo_name") if retrieved else None
 
     yield json.dumps({"__done__": True, "sources": sources, "repo_name": repo_name})
+
+
+def validate_api_key(api_key: str, base_url: str | None = None) -> tuple[bool, str]:
+    url = (base_url or settings.llm_base_url).rstrip("/")
+    try:
+        client = _get_client(api_key)
+        resp = client.get(
+            f"{url}/models",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=httpx.Timeout(8.0, connect=5.0),
+        )
+        if 200 <= resp.status_code < 300:
+            return True, "ok"
+        if resp.status_code == 401:
+            return False, "Invalid API key"
+        return False, f"API returned status {resp.status_code}"
+    except httpx.TimeoutException:
+        return False, "Connection timed out"
+    except httpx.ConnectError:
+        return False, "Cannot reach API endpoint"
+    except Exception as e:
+        return False, str(e)[:200]

@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -43,6 +44,9 @@ class Settings(BaseSettings):
 
     auth_enabled: bool = False
     api_key: str = ""
+
+    jwt_secret: str = "change-me-in-production-use-random-string"
+    jwt_expire_minutes: int = 1440
 
     system_prompt: str = ""
 
@@ -154,6 +158,22 @@ class Settings(BaseSettings):
     def llm_retries_valid(cls, v: int) -> int:
         if v < 0 or v > 5:
             raise ValueError("LLM_MAX_RETRIES must be between 0 and 5")
+        return v
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def jwt_secret_valid(cls, v: str) -> str:
+        if len(v) < 16:
+            raise ValueError("JWT_SECRET must be at least 16 characters")
+        if v == "change-me-in-production-use-random-string":
+            warnings.warn("WARNING: JWT_SECRET is the default value. Change it in production!", stacklevel=2)
+        return v
+
+    @field_validator("jwt_expire_minutes")
+    @classmethod
+    def jwt_expire_valid(cls, v: int) -> int:
+        if v < 1 or v > 43200:
+            raise ValueError("JWT_EXPIRE_MINUTES must be between 1 and 43200 (30 days)")
         return v
 
     @field_validator("cors_origins")

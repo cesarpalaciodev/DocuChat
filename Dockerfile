@@ -26,8 +26,9 @@ USER appuser
 EXPOSE 8000
 
 ENV WORKERS=${WORKERS:-1}
+ENV PORT=${PORT:-8000}
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/api/health')"
 
-CMD ["sh", "-c", "if [ \"$WORKERS\" = \"1\" ]; then exec uvicorn src.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'; else exec gunicorn src.main:app --workers $WORKERS --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --proxy-headers --forwarded-allow-ips '*'; fi"]
+CMD ["sh", "-c", "if [ \"$WORKERS\" = \"1\" ]; then exec uvicorn src.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*'; else exec gunicorn src.main:app --workers $WORKERS --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --proxy-headers --forwarded-allow-ips '*'; fi"]
