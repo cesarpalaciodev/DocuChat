@@ -4,8 +4,11 @@
 [![TypeScript](https://img.shields.io/badge/typescript-5.6-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/react-18-61DAFB)](https://react.dev/)
 [![Tests](https://img.shields.io/badge/tests-43%20passing-green)](./backend/tests/)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![CI](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml)
+[![Lint](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/lint.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/lint.yml)
+[![FastAPI](https://img.shields.io/badge/fastapi-0.115-009688)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED)](./Dockerfile)
 
 Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Supports both **TF-IDF** (local, no GPU) and **API embeddings** (semantic, via OpenAI-compatible API) with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
 

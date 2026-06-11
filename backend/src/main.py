@@ -1,9 +1,12 @@
+import asyncio
+import signal
 import sqlite3
 from collections.abc import AsyncGenerator, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -25,22 +28,50 @@ STATIC_DIR.mkdir(exist_ok=True)
 
 MAX_BODY_SIZE = 10 * 1024 * 1024
 
+_shutdown_event = asyncio.Event()
+
+_LLM_CLIENT: httpx.AsyncClient | None = None
+
+
+def _get_llm_health_client() -> httpx.AsyncClient:
+    global _LLM_CLIENT
+    if _LLM_CLIENT is None or _LLM_CLIENT.is_closed:
+        _LLM_CLIENT = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0))
+    return _LLM_CLIENT
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings.vector_store_path.mkdir(parents=True, exist_ok=True)
     settings.clone_path.mkdir(parents=True, exist_ok=True)
     import shutil
-    from contextlib import suppress
     for item in settings.clone_path.iterdir():
         with suppress(Exception):
             shutil.rmtree(item, ignore_errors=True)
     if not settings.llm_api_key or len(settings.llm_api_key) < 10:
         logger.error("LLM_API_KEY not configured or too short")
         raise SystemExit("LLM_API_KEY must be a valid API key in .env")
+
+    loop = asyncio.get_running_loop()
+    stop_event = asyncio.Event()
+
+    def _handle_sig(sig: int) -> None:
+        logger.info("Received signal %s, initiating graceful shutdown", sig)
+        _shutdown_event.set()
+        stop_event.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with suppress(NotImplementedError):
+            loop.add_signal_handler(sig, _handle_sig, sig)
+
     logger.info("DocuChat starting on %s:%s", settings.host, settings.port)
     yield
-    logger.info("DocuChat shutting down")
+
+    logger.info("DocuChat shutting down gracefully")
+    await asyncio.sleep(1.0)
+    if _LLM_CLIENT and not _LLM_CLIENT.is_closed:
+        await _LLM_CLIENT.aclose()
+    logger.info("DocuChat shutdown complete")
 
 
 app = FastAPI(
@@ -101,27 +132,53 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 
 @app.get("/api/health")
 async def health() -> dict[str, object]:
+    checks: dict[str, str] = {}
+
     try:
         repos = db.repo_list()
-        db_ok = True
+        checks["database"] = "ok"
     except sqlite3.Error:
         repos = []
-        db_ok = False
+        checks["database"] = "error"
+
     try:
-        settings.vector_store_path.exists()
-        vs_ok = True
+        vs_exists = settings.vector_store_path.exists()
+        checks["vector_store"] = "ok" if vs_exists else "error"
     except Exception:
-        vs_ok = False
+        checks["vector_store"] = "error"
+
+    try:
+        vs_path = settings.vector_store_path
+        free_gb = 0.0
+        if vs_path.exists():
+            import shutil
+            usage = shutil.disk_usage(vs_path)
+            free_gb = usage.free / (1024**3)
+        checks["disk_free_gb"] = f"{free_gb:.1f}"
+    except Exception:
+        checks["disk_free_gb"] = "unknown"
+
+    if settings.llm_api_key and len(settings.llm_api_key) >= 10:
+        try:
+            client = _get_llm_health_client()
+            llm_url = f"{settings.llm_base_url.rstrip('/')}/models"
+            resp = await client.get(
+                llm_url,
+                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+            )
+            checks["llm_api"] = "ok" if 200 <= resp.status_code < 500 else f"status_{resp.status_code}"
+        except Exception as e:
+            checks["llm_api"] = f"error: {type(e).__name__}"
+    else:
+        checks["llm_api"] = "unconfigured"
+
+    all_ok = all(v == "ok" for v in checks.values())
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": "ok" if all_ok else "degraded",
         "version": "1.0.0",
         "indexed_repos": len(repos),
         "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
-        "checks": {
-            "database": "ok" if db_ok else "error",
-            "vector_store": "ok" if vs_ok else "error",
-            "llm_configured": "ok" if len(settings.llm_api_key) >= 10 else "unconfigured",
-        },
+        "checks": checks,
     }
 
 
@@ -130,14 +187,14 @@ async def stats() -> dict[str, object]:
     from src.core import database as db
     repos = db.repo_list()
     total_chunks = sum(r.get("indexed_documents", 0) for r in repos)
-    conversations = db.conversation_list()
+    total_convos = db.conversation_count()
     return {
         "total_repos": len(repos),
         "ready_repos": sum(1 for r in repos if r.get("status") == "ready"),
         "indexing_repos": sum(1 for r in repos if r.get("status") == "indexing"),
         "error_repos": sum(1 for r in repos if r.get("status") == "error"),
         "total_chunks": total_chunks,
-        "total_conversations": len(conversations),
+        "total_conversations": total_convos,
     }
 
 

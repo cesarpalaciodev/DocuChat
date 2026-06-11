@@ -1,6 +1,7 @@
 import asyncio
 import re
 import shutil
+import threading
 import uuid
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -20,7 +21,7 @@ logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/repos", tags=["repos"])
 
 _active_clones: int = 0
-_clone_lock = asyncio.Lock()
+_clone_lock = threading.Lock()
 _ID_RE = re.compile(r"^[a-f0-9]{8,64}$")
 
 
@@ -36,7 +37,9 @@ def _validate_repo_id(repo_id: str) -> None:
 def _run_indexing(repo_id: str, repo_url: str, repo_branch: str, repo_name: str) -> None:
     global _active_clones
     try:
-        logger.info("Indexing started: %s (active=%d)", repo_id, _active_clones)
+        with _clone_lock:
+            current = _active_clones
+        logger.info("Indexing started: %s (active=%d)", repo_id, current)
         result = ingest_repository(repo_url, repo_branch)
         indexed = vector_store.index(repo_id, repo_url, repo_name, result["chunks"])
         db.repo_update(repo_id, "ready", indexed)
@@ -46,7 +49,8 @@ def _run_indexing(repo_id: str, repo_url: str, repo_branch: str, repo_name: str)
         error_text = type(e).__name__ if type(e).__name__ != "Exception" else "Indexing failed"
         db.repo_update(repo_id, "error", error=error_text[:200])
     finally:
-        _active_clones -= 1
+        with _clone_lock:
+            _active_clones -= 1
         clone_dir = settings.clone_path / repo_id
         if clone_dir.exists():
             with suppress(Exception):
@@ -57,7 +61,7 @@ def _run_indexing(repo_id: str, repo_url: str, repo_branch: str, repo_name: str)
 async def add_repository(body: RepoRequest) -> RepoResponse:
     global _active_clones
 
-    async with _clone_lock:
+    with _clone_lock:
         if _active_clones >= settings.max_concurrent_clones:
             raise IndexingError("system", f"Too many concurrent clones. Max: {settings.max_concurrent_clones}")
         _active_clones += 1

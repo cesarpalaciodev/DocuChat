@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     auth_enabled: bool = False
     api_key: str = ""
 
+    system_prompt: str = ""
+
     rate_limit_enabled: bool = True
     rate_light_rpm: int = 300
     rate_medium_rpm: int = 60
@@ -152,6 +154,21 @@ class Settings(BaseSettings):
     def llm_retries_valid(cls, v: int) -> int:
         if v < 0 or v > 5:
             raise ValueError("LLM_MAX_RETRIES must be between 0 and 5")
+        return v
+
+    @field_validator("cors_origins")
+    @classmethod
+    def cors_origins_valid(cls, v: str) -> str:
+        origins = [h.strip() for h in v.split(",") if h.strip()]
+        for origin in origins:
+            if not origin.startswith(("http://", "https://")):
+                raise ValueError(f"CORS origin must start with http:// or https://: {origin}")
+            try:
+                parsed = urlparse(origin)
+                if not parsed.hostname:
+                    raise ValueError(f"CORS origin must have a valid hostname: {origin}")
+            except Exception:
+                raise ValueError(f"Invalid CORS origin format: {origin}")
         return v
 
     @property

@@ -113,16 +113,30 @@ def conversation_create(conversation_id: str, repo_id: str | None) -> None:
     conn.close()
 
 
-def conversation_list(repo_id: str | None = None) -> list[dict[str, Any]]:
+def conversation_list(repo_id: str | None = None, offset: int = 0, limit: int = 50) -> list[dict[str, Any]]:
     conn = get_db()
     if repo_id:
         rows = conn.execute(
-            "SELECT * FROM conversations WHERE repo_id = ? ORDER BY created_at DESC", (repo_id,)
+            "SELECT * FROM conversations WHERE repo_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (repo_id, limit, offset),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM conversations ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM conversations ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def conversation_count(repo_id: str | None = None) -> int:
+    conn = get_db()
+    if repo_id:
+        row = conn.execute("SELECT COUNT(*) FROM conversations WHERE repo_id = ?", (repo_id,)).fetchone()
+    else:
+        row = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()
+    conn.close()
+    return int(row[0]) if row else 0
 
 
 def message_add(conversation_id: str, role: str, content: str, sources: list[dict[str, Any]] | None = None) -> int:

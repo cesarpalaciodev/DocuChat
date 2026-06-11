@@ -144,6 +144,12 @@ def _sanitize_llm_error(status_code: int) -> str:
     return f"LLM API returned status {status_code}"
 
 
+def _get_system_prompt() -> str:
+    if settings.system_prompt:
+        return settings.system_prompt
+    return SYSTEM_PROMPT
+
+
 def query(question: str, repo_id: str | None = None) -> dict[str, Any]:
     _sanitize_user_input(question)
 
@@ -156,7 +162,7 @@ def query(question: str, repo_id: str | None = None) -> dict[str, Any]:
     payload = {
         "model": settings.llm_model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _get_system_prompt()},
             {"role": "user", "content": f"Contexto de documentacion:\n{context}\n\nPregunta del usuario: {question}"},
         ],
         "temperature": 0.2,
@@ -193,7 +199,7 @@ def query_stream(question: str, repo_id: str | None = None) -> Generator[str, No
     payload = {
         "model": settings.llm_model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _get_system_prompt()},
             {"role": "user", "content": f"Contexto de documentacion:\n{context}\n\nPregunta del usuario: {question}"},
         ],
         "temperature": 0.2,

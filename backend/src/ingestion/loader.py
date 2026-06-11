@@ -28,6 +28,9 @@ _TEXT_EXTENSIONS = {
     ".php", ".c", ".cpp", ".h", ".hpp", ".yaml", ".yml",
     ".toml", ".json", ".xml", ".cfg", ".conf", ".ini",
     ".sh", ".bat", ".ps1", ".sql", ".graphql", ".proto",
+    ".vue", ".svelte", ".kt", ".kts", ".swift", ".dart",
+    ".lua", ".r", ".jl", ".ex", ".exs", ".zig", ".nim",
+    ".hcl", ".tf", ".gradle", ".dockerfile", ".env.example",
 }
 
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".mypy_cache",

@@ -99,10 +99,20 @@ async def chat_stream(body: ChatRequest) -> StreamingResponse:
 
 
 @router.get("/conversations")
-async def list_conversations(repo_id: str | None = None) -> list[dict[str, Any]]:
+async def list_conversations(
+    repo_id: str | None = None,
+    offset: int = 0,
+    limit: int = 50,
+) -> dict[str, Any]:
     if repo_id and not _ID_RE.match(repo_id):
-        return []
-    return db.conversation_list(repo_id)
+        return {"items": [], "total": 0, "offset": offset, "limit": limit}
+    if offset < 0:
+        offset = 0
+    if limit < 1 or limit > 200:
+        limit = 50
+    items = db.conversation_list(repo_id, offset, limit)
+    total = db.conversation_count(repo_id)
+    return {"items": items, "total": total, "offset": offset, "limit": limit}
 
 
 @router.get("/conversations/{conv_id}")
