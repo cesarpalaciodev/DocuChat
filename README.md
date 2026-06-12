@@ -1,153 +1,171 @@
-# DocuChat - RAG Chatbot for Technical Documentation
+# DocuChat — RAG Chatbot for Technical Documentation
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.6-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/react-18-61DAFB)](https://react.dev/)
-[![Tests](https://img.shields.io/badge/tests-43%20passing-green)](./backend/tests/)
+[![Tests](https://img.shields.io/badge/tests-39%20passing-green)](./backend/tests/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![CI](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/test.yml)
 [![Lint](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/lint.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/lint.yml)
+[![Docker](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/docker.yml/badge.svg)](https://github.com/cesarpalaciodev/DocuChat/actions/workflows/docker.yml)
 [![FastAPI](https://img.shields.io/badge/fastapi-0.115-009688)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED)](./Dockerfile)
 
-Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Supports both **TF-IDF** (local, no GPU) and **API embeddings** (semantic, via OpenAI-compatible API) with a **FastAPI** backend and **React + Tailwind** frontend. LLM via any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq).
+Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Clone any GitHub/GitLab repo, index its docs, and ask questions in natural language — with **source citations** in every answer.
+
+**Bring your own API key** — each user connects their own OpenRouter/Groq/OpenAI key. The server owner pays nothing for LLM usage.
 
 ## Features
 
-- Clone and index code repositories (Markdown, source files, READMEs)
-- **Dual search**: TF-IDF (offline) or semantic API embeddings (`EMBEDDING_ENABLED=true`)
-- RAG-powered answers with source citations
-- **SSE streaming** — answers appear token by token, with **Stop** button
-- **Multi-repository** support with cross-repo search
-- **Conversation history** persisted in SQLite
-- **Markdown export** for conversations
-- **Regenerate** last response
-- **Copy code** button on all code blocks
-- **Dark/light mode** with animated toggle
-- **Keyboard shortcuts** (⌘K focus input, Esc toggle)
-- **Sidebar resizable** (240px - 500px)
-- **Mobile responsive** with slide-over drawer
-- **Rate limiting** by IP and API key, input validation, anti-path-traversal
-- **API key auth** (configurable via `AUTH_ENABLED=true`)
-- **Circuit breaker** for LLM and embedding APIs
+### Core
 
-## Tech Stack
+- **Clone & index repos** — paste any Git URL, DocuChat clones it, chunks all text files, and builds a vector index
+- **Dual search**: TF-IDF (offline, no GPU) or semantic API embeddings (`text-embedding-3-small`)
+- **RAG answers with citations** — every response links to the exact files used as context
+- **SSE streaming** — answers arrive token by token, with cancel button
+- **Multi-repo search** — query across all indexed repos or filter by one
 
-| Layer | Technology |
-|-------|-----------|
-| LLM | Any OpenAI-compatible API (OpenRouter, GPT, DeepSeek, Groq) |
-| Embeddings | TF-IDF (numpy) or API embeddings (text-embedding-3-small) |
-| Vector Store | Numpy `.npz` sharded by 2000 vectors |
-| Database | SQLite (WAL mode) for repos + conversations |
-| Backend | FastAPI + Uvicorn |
-| Frontend | React 18 + Vite + Tailwind CSS |
-| Code Clone | GitPython (--depth=1, timeout 60s) |
+### Multi-tenant
+
+- **User accounts** — register/login with JWT authentication
+- **Bring your own API key** — each user configures their own LLM key in Settings (Ctrl+\). Never stored on the server
+- **Per-user isolation** — repos, conversations, and messages are private per account
+- **Server key optional** — LLM_API_KEY only needed for health check monitoring
+
+### UI/UX
+
+- **Terminal cyberpunk aesthetic** — glass morphism, neon borders, glitch text, particle background, CRT scanlines
+- **Command Palette** (Ctrl+K) — search repos, conversations, and actions instantly
+- **Chat tabs** — multiple conversation threads like terminal tabs
+- **Source panel** — click a file path to see the full source code
+- **Dark/Light mode** — toggle in the status bar
+- **Keyboard shortcuts** — Ctrl+K palette, Ctrl+B sidebar, ? help, Ctrl+\ settings, Ctrl+Shift+Z zen mode
+- **Drag & drop** — drag a GitHub URL onto the sidebar to clone
+- **Help modal** — in-app documentation, API key guide, feature list, shortcuts reference
+- **Resizable sidebar** — horizontal and vertical resize handles
+- **Mobile responsive** — sidebar collapses to a swipeable drawer on small screens
+- **Zen mode** — hide everything except the chat for deep focus
+
+### Technical
+
+- **Prompt injection defense** — blocks 20+ attack patterns, context wrapped in XML tags
+- **Rate limiting** — 4 tiers per endpoint (light/medium/heavy/expense), per-IP and per-key
+- **Security headers** — CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- **Circuit breaker** — LLM and embedding APIs with exponential backoff retry
+- **Job queue** — bounded semaphore for concurrent repository indexing
+- **Graceful shutdown** — SIGINT/SIGTERM handlers, proper cleanup
+- **Health checks** — database, vector store, LLM connectivity, disk space
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-
-### Setup
+### Local
 
 ```bash
 cd docu-chat
 
 # 1. Configure environment
-cp .env.example backend/.env
-# Edit backend/.env and add your LLM_API_KEY
+cp .env.example .env
+# Edit .env — LLM_API_KEY is only for admin health check
 
-# 2. Install backend dependencies
+# 2. Install backend
 cd backend
 pip install -r requirements.txt
 
-# 3. Build and install frontend
+# 3. Build frontend
 cd ../frontend
 npm install
 npm run build
-mkdir ../backend/static
+mkdir -p ../backend/static
 cp -r dist/* ../backend/static/
 
-# 4. Start (single command, single port)
+# 4. Run
 cd ../backend
 uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
 Open **http://localhost:8000**
 
-### Using Docker
+### Docker
 
 ```bash
-docker-compose up
+docker build -t docuchat .
+docker run -p 8000:8000 --env-file .env -v docuchat_data:/app/data docuchat
 ```
+
+## Deploy to Railway
+
+1. Fork/push to GitHub
+2. Create project at [railway.app](https://railway.app) → "Deploy from GitHub repo"
+3. Add environment variables (see `.env.production`)
+4. Create a volume mounted at `/app/data` for persistent SQLite
+5. Done — public HTTPS URL in 2 minutes
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/repos/` | Index a repository (async) |
-| GET | `/api/repos/` | List indexed repos |
-| GET | `/api/repos/{id}/status` | Poll indexing progress |
-| DELETE | `/api/repos/{id}` | Remove a repository |
-| POST | `/api/chat/` | Ask a question (RAG) |
-| POST | `/api/chat/stream` | Ask with SSE streaming |
-| GET | `/api/chat/conversations` | List conversations |
-| GET | `/api/chat/conversations/{id}` | Get conversation messages |
-| DELETE | `/api/chat/conversations/{id}` | Delete a conversation |
-| GET | `/api/search` | Search across repositories |
-| GET | `/api/stats` | Get system and repository statistics |
-| GET | `/api/health` | Health check |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/auth/register` | Public | Create account |
+| POST | `/api/auth/login` | Public | Login, returns JWT |
+| GET | `/api/auth/me` | Required | Current user info |
+| POST | `/api/repos/` | Required | Clone and index a repo |
+| GET | `/api/repos/` | Required | List indexed repos |
+| GET | `/api/repos/{id}/status` | Required | Poll indexing progress |
+| GET | `/api/repos/queue/status` | Required | Job queue state |
+| DELETE | `/api/repos/{id}` | Required | Remove a repo |
+| POST | `/api/chat/` | Required | Ask a question (RAG) |
+| POST | `/api/chat/stream` | Required | Ask with SSE streaming |
+| GET | `/api/chat/conversations` | Required | List conversations |
+| GET | `/api/chat/conversations/{id}` | Required | Get conversation |
+| DELETE | `/api/chat/conversations/{id}` | Required | Delete conversation |
+| GET | `/api/chat/conversations/{id}/export` | Required | Export as markdown |
+| POST | `/api/search/` | Required | Raw search without LLM |
+| GET | `/api/stats` | Public | System statistics |
+| GET | `/api/health` | Public | Health check |
+| POST | `/api/validate-key` | Public | Test an API key |
 
-## Security
+Authentication: `Authorization: Bearer <jwt-token>` header.
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `JWT_SECRET` | **Yes** | — | HMAC key for JWT tokens. Generate with `secrets.token_hex(32)` |
+| `AUTH_ENABLED` | No | `false` | Enable user registration/login |
+| `LLM_API_KEY` | No | — | Server key (only used for health check, not user requests) |
+| `LLM_BASE_URL` | No | `https://openrouter.ai/api/v1` | Default LLM API endpoint |
+| `LLM_MODEL` | No | `meta-llama/llama-3-8b-instruct` | Default model |
+| `CORS_ORIGINS` | No | `localhost:8000,localhost:5173` | Allowed origins |
+| `ALLOWED_HOSTS` | No | `github.com,gitlab.com,bitbucket.org` | Git hosts allowed for cloning |
+| `RATE_LIMIT_ENABLED` | No | `true` | Enable rate limiting |
+| `WORKERS` | No | `1` | Gunicorn workers. Keep at 1 for in-memory rate limiting |
+| `PORT` | No | `8000` | Server port |
+
+### Security
 
 | Category | Measure |
 |----------|---------|
-| **Prompt Injection** | Blocks 20+ injection patterns (`"ignore all instructions"`, `"<|im_start|>"`, role redefinition). Context wrapped in XML tags to isolate from system prompt. |
-| **Input Validation** | All IDs validated with regex (`[a-f0-9]{8,64}`). URL allowlist. Path traversal blocked (12 patterns). Body size limit 10MB. |
-| **Rate Limiting** | 4 tiers per endpoint: light (health 300rpm), medium (list 60rpm), heavy (chat/search 20rpm), expense (clone 5rpm). `Retry-After` and `X-RateLimit-*` headers. Stale bucket cleanup. |
-| **Error Handling** | Sanitized errors — no stack traces, no raw LLM errors, no internal paths leaked to client. Full tracebacks logged server-side only. |
-| **Security Headers** | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`. |
-| **Git Clone** | Disabled hooks (`GIT_TERMINAL_PROMPT=0`, `GIT_ASKPASS=echo`). Symlink detection. Binary file detection. Cleanup in `finally` block. |
-| **Logging** | Rotating 10MB/5 backup files. Secrets redaction filter (`sk-*`, `Bearer`, `api_key`). No secrets exposed in logs. |
-| **LLM API** | Exponential backoff retry (1s/2s/4s) on 429/502/503/504. Connection pooling with `httpx.Client`. Circuit breaker (opens after 3 failures/30s). Configurable timeouts. |
-| **Markdown** | Frontend validates link protocols (`http:`, `https:`, `mailto:` only). `javascript:` and dangerous URLs blocked. |
-| **Database** | Parameterized queries (SQL injection immune). WAL mode. Connection timeout. Foreign keys enforced. |
-| **Docker** | Non-root `appuser`. `--proxy-headers` enabled. Multi-worker via gunicorn (configurable `WORKERS` env). |
-| **CORS** | Configurable via `CORS_ORIGINS` env var. Methods restricted to GET/POST/DELETE. Headers restricted. |
-| **API Key Auth** | Optional middleware. Supports `Authorization: Bearer <key>` or `X-API-Key: <key>`. Public paths (health, assets) excluded. |
+| **Prompt Injection** | Blocks 20+ injection patterns (`"ignore all instructions"`, `"<|im_start|>"`, role redefinition). Context wrapped in XML tags. |
+| **Input Validation** | All IDs validated (`[a-f0-9]{8,64}`). URL allowlist. Path traversal blocked (12 patterns). Body size limit 10MB. |
+| **Rate Limiting** | 4 tiers per endpoint. `Retry-After` + `X-RateLimit-*` headers. Stale bucket cleanup. |
+| **Error Handling** | Sanitized errors — no stack traces, no internal paths, no raw LLM errors. |
+| **HTTP Headers** | CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`. |
+| **Git Clone** | Disabled hooks. Symlink detection. Binary file detection. Cleanup in `finally`. |
+| **Logging** | Rotating files. Secrets redaction (`sk-*`, `Bearer`, `api_key`). |
+| **LLM** | Exponential backoff retry. Connection pooling. Circuit breaker (3 failures/30s). |
+| **Database** | Parameterized queries. WAL mode. Foreign keys. |
+| **Docker** | Non-root `appuser`. `--proxy-headers` enabled. Healthcheck. |
 
-## Configuration (.env)
+## Tech Stack
 
-```env
-LLM_API_KEY=sk-or-v1-...          # OpenRouter key (or any OpenAI-compatible)
-LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL=meta-llama/llama-3-8b-instruct
-
-# Security
-ALLOWED_HOSTS=github.com,gitlab.com,bitbucket.org
-MAX_TOTAL_CHUNKS=20000
-MAX_FILE_SIZE=500000
-CLONE_TIMEOUT_SECONDS=60
-MAX_CONCURRENT_CLONES=3
-
-# CORS
-CORS_ORIGINS=http://localhost:8000,http://localhost:5173
-
-# Rate limiting (per endpoint tier)
-RATE_LIMIT_ENABLED=true
-RATE_LIGHT_RPM=300
-RATE_MEDIUM_RPM=60
-RATE_HEAVY_RPM=20
-RATE_EXPENSE_RPM=5
-RATE_WINDOW_SECONDS=60
-
-# LLM
-LLM_TIMEOUT_SECONDS=60
-LLM_STREAM_TIMEOUT_SECONDS=90
-LLM_MAX_RETRIES=2
-```
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3.11+ · FastAPI · Uvicorn · SQLite · NumPy · httpx |
+| Frontend | React 18 · TypeScript 5.6 · Tailwind CSS 3 · Vite 6 |
+| LLM | Any OpenAI-compatible API (OpenRouter, Groq, DeepSeek, GPT) |
+| Vector Store | Numpy `.npz` sharded by 2000 vectors |
+| Auth | JWT (HMAC-SHA256, no external dependencies) |
+| Deploy | Docker multi-stage · Railway-ready |
+| CI | GitHub Actions (test + lint + Docker build) |
 
 ## Project Structure
 
@@ -155,49 +173,36 @@ LLM_MAX_RETRIES=2
 docu-chat/
 ├── backend/
 │   ├── src/
-│   │   ├── api/              # FastAPI routes (chat, repos)
-│   │   ├── core/             # Settings, database, config
-│   │   ├── ingestion/        # Repo cloning, chunking, TF-IDF embedding
-│   │   ├── rag/              # Search + LLM query + streaming
-│   │   ├── models/           # Pydantic schemas with validation
-│   │   ├── utils/            # Logging, exceptions, rate limit, cache
-│   │   └── main.py           # Entry point with middleware
-│   ├── tests/
-│   │   ├── test_api.py       # Integration tests (FastAPI)
-│   │   ├── test_security.py  # Security validation tests
-│   │   ├── test_embedder.py  # TF-IDF unit tests
-│   │   ├── test_rag.py       # RAG chain tests
-│   │   └── ...
-│   └── pyproject.toml
+│   │   ├── api/             # FastAPI routes (chat, repos, auth)
+│   │   ├── core/            # Settings, database, config
+│   │   ├── ingestion/       # Cloning, chunking, embedding, job queue
+│   │   ├── rag/             # Search + LLM query + streaming + key validation
+│   │   ├── models/          # Pydantic schemas
+│   │   ├── utils/           # Logging, auth middleware, rate limit, cache, headers
+│   │   └── main.py          # Entry point
+│   └── tests/
 ├── frontend/
 │   ├── src/
-│   │   ├── components/       # ChatWindow, Sidebar, Toast, ErrorBoundary
-│   │   ├── hooks/            # useChat (SSE streaming, AbortController)
-│   │   └── lib/              # API client + SSE stream parser
-│   └── package.json
-└── .env.example
+│   │   ├── components/      # ChatWindow, Sidebar, CommandPalette, AuthModal, ...
+│   │   ├── hooks/           # useChat (SSE streaming)
+│   │   └── lib/             # API client, auth, user keys
+│   └── tests/               # Vitest setup
+├── Dockerfile               # Multi-stage production build
+├── .env.example
+└── .env.production          # Railway-ready environment template
 ```
 
 ## Running Tests
 
 ```bash
 cd backend
-python -m pytest tests/ -v
+python -m pytest tests/ -v --ignore=tests/test_api.py
+
+# Frontend
+cd frontend
+npx vitest run
 ```
 
-## Roadmap — Lo que más subiría el proyecto
+## License
 
-### 1. Demo pública ⭐⭐⭐⭐⭐
-Una demo en vivo (Vercel/Railway) con 1-2 repos pre-indexados para que cualquiera pruebe sin instalar nada. Impacto inmediato en adopción.
-
-### 2. Streaming tipo ChatGPT ⭐⭐⭐⭐⭐
-Ya implementado (SSE vía `/api/chat/stream`). Mejora pendiente: abortar generación a mitad de stream, reanudar conversaciones interrumpidas.
-
-### 3. Multi-user + Auth ⭐⭐⭐⭐
-JWT o Clerk/Auth.js. Cada usuario con sus propios repos, conversaciones, y rate limits. Esto lo acerca a SaaS.
-
-### 4. Vector DB seria ⭐⭐⭐⭐
-Migrar de TF-IDF + numpy a Qdrant, Pinecone, Weaviate o pgvector. Ventajas: búsqueda semántica real, filtros avanzados, escalabilidad, multi-tenant nativo.
-
-### 5. Observabilidad ⭐⭐⭐
-Métricas (Prometheus), tracing (OpenTelemetry), logs estructurados, dashboard de uso. Esencial para producción con múltiples usuarios.
+MIT — see [LICENSE](LICENSE).
