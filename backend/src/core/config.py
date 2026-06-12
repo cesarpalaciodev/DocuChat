@@ -66,8 +66,10 @@ class Settings(BaseSettings):
     @field_validator("llm_api_key")
     @classmethod
     def key_not_empty(cls, v: str) -> str:
+        if not v:
+            return v
         placeholders = ("tu_key", "tu_api", "gsk_your", "sk-or-v1-PON", "sk-your")
-        if not v or any(v.startswith(p) for p in placeholders):
+        if any(v.startswith(p) for p in placeholders):
             raise ValueError("LLM_API_KEY must be a real API key")
         return v
 
