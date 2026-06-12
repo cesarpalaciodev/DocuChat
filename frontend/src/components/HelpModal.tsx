@@ -50,10 +50,10 @@ export default function HelpModal({ isOpen, onClose, onOpenSettings }: Props) {
           <section>
             <h3 className="text-[11px] text-[var(--accent-neon)] font-bold uppercase tracking-[0.2em] mb-3">Getting Started</h3>
             <div className="space-y-2 text-[12px] text-[var(--text-primary)] font-mono leading-relaxed">
-              <p>1. <strong className="text-[var(--text-bright)]">Clone a repository</strong> &mdash; enter a GitHub/GitLab URL in the sidebar and click <span className="text-[var(--accent-neon)]">index</span>.</p>
-              <p>2. <strong className="text-[var(--text-bright)]">Configure your API key</strong> &mdash; open <button onClick={() => { onOpenSettings(); onClose() }} className="text-[var(--accent-neon)] underline cursor-pointer hover:text-white">Settings (Ctrl+\)</button> and paste your OpenRouter, OpenAI, Groq, or DeepSeek key.</p>
-              <p>3. <strong className="text-[var(--text-bright)]">Ask a question</strong> &mdash; type in the input and press Enter. Answers stream token by token with source citations.</p>
-              <p>4. <strong className="text-[var(--text-bright)]">Click a source</strong> &mdash; opens the full file in a side panel. Click the file path in citations to inspect context.</p>
+              <p>1. <strong className="text-[var(--text-bright)]">Register an account</strong> &mdash; create a username and password. Your repos and conversations are private.</p>
+              <p>2. <strong className="text-[var(--text-bright)]">Connect your API key</strong> &mdash; open <button onClick={() => { onOpenSettings(); onClose() }} className="text-[var(--accent-neon)] underline cursor-pointer hover:text-white">Settings (Ctrl+\)</button> and paste your OpenRouter, OpenAI, Groq, or DeepSeek key. It stays in your browser, never on the server.</p>
+              <p>3. <strong className="text-[var(--text-bright)]">Clone a repository</strong> &mdash; enter a GitHub/GitLab URL in the sidebar and click <span className="text-[var(--accent-neon)]">index</span>.</p>
+              <p>4. <strong className="text-[var(--text-bright)]">Ask a question</strong> &mdash; type in the input and press Enter. Answers stream token by token with source citations. Click a source to see the full file.</p>
             </div>
           </section>
 

@@ -127,25 +127,36 @@ export default function App() {
     <ErrorBoundary>
       <ParticleBackground />
       <div className="flex h-screen overflow-hidden crt-overlay" style={{ position: "relative", zIndex: 1 }}>
-        {((!collapsed && !zenMode) || mobileDrawerOpen) && (
-          <>
-            {mobileDrawerOpen && (
-              <div className="drawer-overlay md:hidden" onClick={() => setMobileDrawerOpen(false)} />
-            )}
-            <aside className={`${mobileDrawerOpen ? "drawer open" : ""} ${!mobileDrawerOpen && !collapsed && !zenMode ? "hidden md:block" : ""}`}>
-              <Sidebar
-                selectedRepo={selectedRepo}
-                onSelectRepo={setSelectedRepo}
-                onLoadConversation={handleLoadConversation}
-                width={width}
-                onResize={setWidth}
-                minWidth={MIN_WIDTH}
-                maxWidth={MAX_WIDTH}
-                onDoubleClickRepo={setDetailRepo}
-              />
-            </aside>
-          </>
-        )}
+        {/* Desktop sidebar - visible when not collapsed and not in zen mode */}
+        <div className="hidden md:block">
+          {!collapsed && !zenMode && (
+            <Sidebar
+              selectedRepo={selectedRepo}
+              onSelectRepo={setSelectedRepo}
+              onLoadConversation={handleLoadConversation}
+              width={width}
+              onResize={setWidth}
+              minWidth={MIN_WIDTH}
+              maxWidth={MAX_WIDTH}
+              onDoubleClickRepo={setDetailRepo}
+            />
+          )}
+        </div>
+
+        {/* Mobile drawer */}
+        <div className={`drawer-overlay md:hidden ${mobileDrawerOpen ? "open" : ""}`} onClick={() => setMobileDrawerOpen(false)} />
+        <aside className={`drawer md:hidden w-[85vw] max-w-[350px] ${mobileDrawerOpen ? "open" : ""}`}>
+          <Sidebar
+            selectedRepo={selectedRepo}
+            onSelectRepo={(id) => { setSelectedRepo(id); setMobileDrawerOpen(false) }}
+            onLoadConversation={(id) => { handleLoadConversation(id); setMobileDrawerOpen(false) }}
+            width={Math.min(350, typeof window !== "undefined" ? window.innerWidth * 0.85 : 320)}
+            onResize={setWidth}
+            minWidth={280}
+            maxWidth={350}
+            onDoubleClickRepo={(r) => { setDetailRepo(r); setMobileDrawerOpen(false) }}
+          />
+        </aside>
         <div className="flex-1 flex flex-col min-w-0">
           <ChatWindow
             selectedRepo={selectedRepo}
