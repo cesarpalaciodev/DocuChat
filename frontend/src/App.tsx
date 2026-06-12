@@ -48,6 +48,15 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser)
 
   const [repos, setRepos] = useState<Repo[]>([])
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const isMobile = useRef(false)
+
+  useEffect(() => {
+    isMobile.current = window.innerWidth < 768
+    const handler = () => { isMobile.current = window.innerWidth < 768 }
+    window.addEventListener("resize", handler)
+    return () => window.removeEventListener("resize", handler)
+  }, [])
 
   useEffect(() => {
     import("./lib/api").then(({ listRepos }) => {
@@ -118,17 +127,24 @@ export default function App() {
     <ErrorBoundary>
       <ParticleBackground />
       <div className="flex h-screen overflow-hidden crt-overlay" style={{ position: "relative", zIndex: 1 }}>
-        {!collapsed && !zenMode && (
-          <Sidebar
-            selectedRepo={selectedRepo}
-            onSelectRepo={setSelectedRepo}
-            onLoadConversation={handleLoadConversation}
-            width={width}
-            onResize={setWidth}
-            minWidth={MIN_WIDTH}
-            maxWidth={MAX_WIDTH}
-            onDoubleClickRepo={setDetailRepo}
-          />
+        {((!collapsed && !zenMode) || mobileDrawerOpen) && (
+          <>
+            {mobileDrawerOpen && (
+              <div className="drawer-overlay md:hidden" onClick={() => setMobileDrawerOpen(false)} />
+            )}
+            <aside className={`${mobileDrawerOpen ? "drawer open" : ""} ${!mobileDrawerOpen && !collapsed && !zenMode ? "hidden md:block" : ""}`}>
+              <Sidebar
+                selectedRepo={selectedRepo}
+                onSelectRepo={setSelectedRepo}
+                onLoadConversation={handleLoadConversation}
+                width={width}
+                onResize={setWidth}
+                minWidth={MIN_WIDTH}
+                maxWidth={MAX_WIDTH}
+                onDoubleClickRepo={setDetailRepo}
+              />
+            </aside>
+          </>
         )}
         <div className="flex-1 flex flex-col min-w-0">
           <ChatWindow
@@ -147,6 +163,7 @@ export default function App() {
             onOpenHelp={() => setHelpOpen(true)}
             onOpenAuth={() => setAuthModalOpen(true)}
             currentUser={currentUser}
+            onToggleMobileDrawer={() => setMobileDrawerOpen((v) => !v)}
           />
         </div>
         {activeSource && !zenMode && (

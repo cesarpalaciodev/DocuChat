@@ -40,6 +40,7 @@ interface Props {
   onOpenSettings?: () => void
   onOpenHelp?: () => void
   onOpenAuth?: () => void
+  onToggleMobileDrawer?: () => void
   currentUser?: AuthUser | null
 }
 
@@ -64,6 +65,7 @@ export default function ChatWindow({
   onNewTab: externalOnNewTab,
   onCloseTab: externalOnCloseTab,
   onSelectTab: externalOnSelectTab,
+  onToggleMobileDrawer,
   onOpenSettings,
   onOpenHelp,
   onOpenAuth,
@@ -146,11 +148,20 @@ export default function ChatWindow({
         />
       )}
 
-      <header className="flex items-center justify-between px-6 py-4 glass">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 glass">
+        <div className="flex items-center gap-1 md:gap-3">
+          <button
+            onClick={onToggleMobileDrawer}
+            className="md:hidden text-[var(--accent-neon)] hover:text-white transition-colors duration-200 cursor-pointer p-1.5 rounded hover:bg-[var(--accent-neon)]/10"
+            aria-label="Toggle sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
           <button
             onClick={onToggleSidebar}
-            className="text-[var(--accent-neon)] hover:text-white transition-all duration-200 cursor-pointer p-1.5 rounded border border-[var(--accent-neon)]/30 hover:border-[var(--accent-neon)] hover:bg-[var(--accent-neon)]/10"
+            className="hidden md:flex text-[var(--accent-neon)] hover:text-white transition-all duration-200 cursor-pointer p-1.5 rounded border border-[var(--accent-neon)]/30 hover:border-[var(--accent-neon)] hover:bg-[var(--accent-neon)]/10"
             title={sidebarCollapsed ? "Show sidebar (Ctrl+B)" : "Hide sidebar (Ctrl+B)"}
             aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
           >
@@ -168,13 +179,13 @@ export default function ChatWindow({
               {selectedRepo ? <span className="text-[var(--accent-cyan)]">repo:</span> : <span className="text-[var(--accent-neon)]">global:</span>}
               {" "}{selectedRepo ? selectedRepo.slice(0, 8) : "query"}
             </h2>
-            <p className="text-[10px] text-[var(--text-dim)] mt-0.5">
+            <p className="text-[10px] text-[var(--text-dim)] mt-0.5 desktop-only">
               {selectedRepo ? "single-repo mode" : "searching all indexed repos"}
             </p>
           </div>
         </div>
         {messages.length > 0 && (
-          <button onClick={clear} className="flex items-center gap-2 px-4 py-2 text-[11px] text-[var(--text-dim)] hover:text-[var(--accent-red)] border border-[var(--border-dim)] hover:border-[var(--accent-red)]/40 transition-colors duration-200 cursor-pointer font-mono uppercase tracking-wider btn-press glass" aria-label="Clear chat">
+          <button onClick={clear} className="desktop-only flex items-center gap-2 px-4 py-2 text-[11px] text-[var(--text-dim)] hover:text-[var(--accent-red)] border border-[var(--border-dim)] hover:border-[var(--accent-red)]/40 transition-colors duration-200 cursor-pointer font-mono uppercase tracking-wider btn-press glass" aria-label="Clear chat">
             clear
           </button>
         )}
@@ -265,7 +276,7 @@ export default function ChatWindow({
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold font-mono glass ${msg.role === "user" ? "neon-border-subtle text-[var(--accent-amber)]" : "neon-border text-[var(--accent-neon)]"}`}>
                     {msg.role === "user" ? "$" : ">"}
                   </div>
-                  <div className={`max-w-[78%] px-5 py-4 card-hover ${msg.role === "user" ? "glass rounded-l-xl rounded-tr-xl border-[var(--accent-amber)]/20" : "glass rounded-r-xl rounded-tl-xl"}`}>
+                  <div className={`msg-bubble max-w-[78%] px-5 py-4 card-hover ${msg.role === "user" ? "glass rounded-l-xl rounded-tr-xl border-[var(--accent-amber)]/20" : "glass rounded-r-xl rounded-tl-xl"}`}>
                     {msg.role === "assistant" ? (
                       <div className="prose prose-sm max-w-none
                         [&_*]:font-mono [&_*]:transition-none
@@ -347,7 +358,7 @@ export default function ChatWindow({
         )}
       </div>
 
-      <form ref={formRef} onSubmit={handleSubmit} className="glass p-4 relative">
+      <form ref={formRef} onSubmit={handleSubmit} className="glass p-2 md:p-4 relative">
         <div className="max-w-3xl mx-auto flex items-stretch gap-0 relative">
           <span className="flex items-center px-3 text-sm text-[var(--accent-neon)] bg-[var(--bg-input)] border border-r-0 border-[var(--border-glow)] rounded-l-lg font-mono select-none" style={{ textShadow: "0 0 6px rgba(34,211,160,0.3)" }}>$</span>
           <input

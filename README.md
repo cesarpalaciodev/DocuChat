@@ -13,7 +13,7 @@
 
 Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Clone any GitHub/GitLab repo, index its docs, and ask questions in natural language — with **source citations** in every answer.
 
-**Bring your own API key** — each user connects their own OpenRouter/Groq/OpenAI key. The server owner pays nothing for LLM usage.
+**Bring your own API key** — each user connects their own OpenRouter/Groq/OpenAI key after creating an account. The server owner pays nothing for LLM usage.
 
 ## Features
 
@@ -43,7 +43,7 @@ Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documen
 - **Drag & drop** — drag a GitHub URL onto the sidebar to clone
 - **Help modal** — in-app documentation, API key guide, feature list, shortcuts reference
 - **Resizable sidebar** — horizontal and vertical resize handles
-- **Mobile responsive** — sidebar collapses to a swipeable drawer on small screens
+- **Mobile responsive** — sidebar slides as a drawer on small screens. Full-screen modals. Compact touch-friendly input.
 - **Zen mode** — hide everything except the chat for deep focus
 
 ### Technical
@@ -58,7 +58,17 @@ Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documen
 
 ## Quick Start
 
-### Local
+### Online (Railway)
+
+1. Open the app URL (e.g. `https://docuchat.up.railway.app`)
+2. **Register** — create an account with username and password
+3. Press **Ctrl+\** (or click the gear icon) to open Settings
+4. **Paste your API key** from OpenRouter, Groq, or OpenAI
+5. Click **Test** — once validated, click **Save**
+6. **Clone a repo** — paste a GitHub/GitLab URL in the sidebar
+7. **Ask a question** — type in the chat input and press Enter
+
+### Local Development
 
 ```bash
 cd docu-chat

@@ -440,3 +440,48 @@
   .source-expand { transition: none; }
   body { background-image: none; }
 }
+
+@media (max-width: 640px) {
+  .modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+  .modal-card-content {
+    max-height: calc(100vh - 60px) !important;
+    overflow-y: auto;
+  }
+
+  .source-panel {
+    position: fixed !important;
+    bottom: 0 !important;
+    top: auto !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 60vh !important;
+    transform: translateY(100%) !important;
+    border-radius: 16px 16px 0 0 !important;
+    z-index: 30 !important;
+  }
+  .source-panel.hidden {
+    transform: translateY(100%) !important;
+  }
+  .source-panel:not(.hidden) {
+    transform: translateY(0) !important;
+  }
+
+  .msg-bubble {
+    max-width: 90% !important;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  .status-bar-text {
+    display: none;
+  }
+}
