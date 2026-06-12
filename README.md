@@ -13,7 +13,13 @@
 
 Chatbot with Retrieval-Augmented Generation (RAG) for querying technical documentation from code repositories. Clone any GitHub/GitLab repo, index its docs, and ask questions in natural language — with **source citations** in every answer.
 
-**Bring your own API key** — each user connects their own OpenRouter/Groq/OpenAI key after creating an account. The server owner pays nothing for LLM usage.
+**How it works:**
+1. **Register** — create an account (each user has private repos and conversations)
+2. **Settings** — connect your own LLM API key (OpenRouter, Groq, or OpenAI)
+3. **Clone a repo** via the sidebar
+4. **Ask questions** — answers stream token by token with source file citations
+
+**You bring your own API key** — the server owner pays nothing for LLM usage. Your key is never stored on the server.
 
 ## Features
 
