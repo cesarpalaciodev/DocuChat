@@ -8,6 +8,8 @@ RUN npm run build
 
 FROM python:3.11-slim
 
+RUN apt-get update -qq && apt-get install -y -qq git && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
