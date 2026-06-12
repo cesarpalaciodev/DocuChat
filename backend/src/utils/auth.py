@@ -9,7 +9,7 @@ from src.utils.logging import setup_logger
 
 logger = setup_logger(__name__)
 
-_PUBLIC_PATHS = {"/api/health", "/api/stats", "/api/auth/login", "/api/auth/register"}
+_PUBLIC_PATHS = {"/api/health", "/api/stats", "/api/auth/login", "/api/auth/register", "/api/validate-key"}
 _PUBLIC_PREFIXES = ("/assets/",)
 
 # All non-API paths are public (SPA, static files)
